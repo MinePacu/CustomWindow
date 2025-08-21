@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>CustomWindow</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+	<WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Pages\ColorSetting.xaml" />
+    <None Remove="Pages\NormalSetting.xaml" />
+    <None Remove="Pages\WindowSetting.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.250402" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4948" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250606001" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="Pages\ColorSetting.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="Pages\NormalSetting.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="Pages\WindowSetting.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+  </PropertyGroup>
+
+  <!-- Copy native DLL after build if it exists (robust, no error if missing) -->
+  <Target Name="CopyBorderServiceNative" AfterTargets="Build">
+    <PropertyGroup>
+      <!-- path from this csproj directory up to solution root -->
+      <BorderServiceNativePath>$(MSBuildProjectDirectory)\..\..\..\x64\$(Configuration)\BorderServiceCpp.dll</BorderServiceNativePath>
+    </PropertyGroup>
+    <ItemGroup Condition="Exists('$(BorderServiceNativePath)')">
+      <_NativeDll Include="$(BorderServiceNativePath)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_NativeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="@( _NativeDll ) != ''" />
+    <Message Importance="High" Text="[CopyBorderServiceNative] Copied BorderServiceCpp.dll to $(OutDir)" Condition="@( _NativeDll ) != ''" />
+    <Message Importance="Low" Text="[CopyBorderServiceNative] Native DLL not found at $(BorderServiceNativePath) (will skip copy)" Condition="!Exists('$(BorderServiceNativePath)')" />
+  </Target>
+</Project>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="CustomWindow.Pages.ColorSetting"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:CustomWindow.Pages"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    mc:Ignorable="d">
+
+    <Grid HorizontalAlignment="Stretch" MaxWidth="990">
+        <ScrollViewer HorizontalAlignment="Stretch" IsDeferredScrollingEnabled="True" VerticalScrollBarVisibility="Visible" MaxWidth="990" Margin="0,20,0,20">
+            <StackPanel x:Name="Panel" HorizontalAlignment="Stretch" Spacing="8">
+                <TextBlock Text="색 설정" Margin="0,14,0,4" FontSize="14" FontWeight="Bold" />
+
+                <controls:SettingsExpander Header="테두리(모서리) 색">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
+                    </controls:SettingsExpander.HeaderIcon>
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard Header="시스템 색상 사용">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderSystemColor, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="투명">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderTransparency, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="색 선택">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" CornerRadius="4"/>
+                                <ColorPicker Color="{x:Bind ViewModel.BorderColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <controls:SettingsExpander Header="제목 표시줄 색" Description="기본은 윈도우 색상 및 설정에 따릅니다.">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
+                    </controls:SettingsExpander.HeaderIcon>
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard Header="시스템 색상 사용">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionSystemColor, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="투명">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTransparency, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="색 선택">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.CaptionBrush, Mode=OneWay}" CornerRadius="4"/>
+                                <ColorPicker Color="{x:Bind ViewModel.CaptionColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <controls:SettingsExpander Header="제목 표시줄 글자 색">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
+                    </controls:SettingsExpander.HeaderIcon>
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard Header="시스템 색상 사용">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTextSystemColor, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="투명">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTextTransparency, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="텍스트 색 선택">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" CornerRadius="4"/>
+                                <ColorPicker Color="{x:Bind ViewModel.CaptionTextColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+                        <controls:SettingsCard Header="색상 모드">
+                            <ComboBox SelectedItem="{x:Bind ViewModel.CaptionTextColorMode, Mode=TwoWay}">
+                                <x:String>자동</x:String>
+                                <x:String>수동</x:String>
+                            </ComboBox>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <controls:SettingsCard Header="캡션 색상 모드" Margin="0,14,0,4">
+                    <controls:SettingsCard.Content>
+                        <ComboBox SelectedItem="{x:Bind ViewModel.CaptionColorMode, Mode=TwoWay}">
+                            <x:String>밝게</x:String>
+                            <x:String>어둡게</x:String>
+                            <x:String>커스텀</x:String>
+                        </ComboBox>
+                    </controls:SettingsCard.Content>
+                </controls:SettingsCard>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
