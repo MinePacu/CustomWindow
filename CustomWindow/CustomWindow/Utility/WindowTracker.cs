@@ -9,20 +9,14 @@ using System.Threading;
 
 namespace CustomWindow.Utility;
 
-/// <summary>
-/// AutoWindowChange 가 켜져 있는 동안 현재 사용자에게 보이는 top-level window 핸들을 주기적으로 수집하고,
-/// 사라진 창은 목록에서 제거하여 메모리 누수를 방지하는 경량 추적기.
-/// 로그 기능을 제공하여 상태 변화를 확인할 수 있음.
-/// </summary>
 public static class WindowTracker
 {
     private static readonly ConcurrentDictionary<nint, TrackedWindow> _windows = new();
     private static Timer? _timer;
     private static readonly object _sync = new();
     private static bool _running;
-    private static TimeSpan _interval = TimeSpan.FromMilliseconds(1000); // 기본 1초 주기
+    private static TimeSpan _interval = TimeSpan.FromMilliseconds(1000);
 
-    // 로그 저장 (고정 길이)
     private static readonly int _logCapacity = 500;
     private static readonly ConcurrentQueue<string> _logs = new();
     public static event Action<string>? LogAdded;
@@ -41,6 +35,9 @@ public static class WindowTracker
 
     /// <summary>최근 로그 전체 반환 (최신순)</summary>
     public static IReadOnlyList<string> GetRecentLogs() => _logs.Reverse().ToList();
+
+    // New: provide process names along with handles for filtering (excluded list etc.)
+    public static IReadOnlyList<(nint Handle, string? ProcessName)> GetCurrentWindowsDetailed() => _windows.Values.Select(w => (w.Handle, w.ProcessName)).ToList();
 
     /// <summary>추적 시작 (이미 실행 중이면 무시)</summary>
     public static void Start(TimeSpan? interval = null)
@@ -83,11 +80,14 @@ public static class WindowTracker
         {
             var now = DateTime.UtcNow;
             var seen = new HashSet<nint>();
+            int skippedInvisible = 0;
+            int addedCount = 0;
             EnumWindows((hwnd, lparam) =>
             {
-                if (!IsWindowVisible(hwnd)) return true; // continue
+                if (!IsWindowVisible(hwnd)) { skippedInvisible++; return true; }
                 if (IsIconic(hwnd)) return true; // 최소화 창 제외
                 if (!HasNonEmptyTitle(hwnd)) return true; // 제목 없는 창 제외
+                if (!HasUsableRect(hwnd)) return true; // zero / off-screen
                 GetWindowThreadProcessId(hwnd, out var pid);
                 if (pid == 0) return true;
                 var handle = (nint)hwnd;
@@ -106,10 +106,7 @@ public static class WindowTracker
                         };
                     },
                     (_, existing) => { existing.LastSeen = now; return existing; });
-                if (added)
-                {
-                    AddLog($"추가: 0x{handle.ToInt64():X} PID={pid} {(SafeGetProcessName(pid) ?? "?")}");
-                }
+                if (added) { addedCount++; AddLog($"추가: 0x{handle.ToInt64():X} PID={pid} {(SafeGetProcessName(pid) ?? "?")}"); }
                 seen.Add(handle);
                 return true;
             }, 0);
@@ -123,7 +120,7 @@ public static class WindowTracker
                         removed++;
                 }
             }
-            AddLog($"Tick: Active={seen.Count} Removed={removed}");
+            AddLog($"Tick: Active={seen.Count} Added={addedCount} Removed={removed} SkipInvisible={skippedInvisible}");
         }
         catch (Exception ex)
         {
@@ -138,6 +135,24 @@ public static class WindowTracker
         var sb = new StringBuilder(len + 1);
         if (GetWindowText(hwnd, sb, sb.Capacity) <= 0) return false;
         return sb.ToString().Trim().Length > 0;
+    }
+
+    private static bool HasUsableRect(nint hwnd)
+    {
+        RECT rc;
+        if (!GetWindowRect(hwnd, out rc)) return false;
+        int w = rc.Right - rc.Left;
+        int h = rc.Bottom - rc.Top;
+        if (w <= 0 || h <= 0) return false;
+        // basic off-screen check against virtual screen
+        int vx = GetSystemMetrics(76); // SM_XVIRTUALSCREEN
+        int vy = GetSystemMetrics(77); // SM_YVIRTUALSCREEN
+        int vw = GetSystemMetrics(78); // SM_CXVIRTUALSCREEN
+        int vh = GetSystemMetrics(79); // SM_CYVIRTUALSCREEN
+        int vRight = vx + vw;
+        int vBottom = vy + vh;
+        if (rc.Right <= vx || rc.Left >= vRight || rc.Bottom <= vy || rc.Top >= vBottom) return false;
+        return true;
     }
 
     private static string? SafeGetProcessName(uint pid)
@@ -181,5 +196,12 @@ public static class WindowTracker
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
     #endregion
 }

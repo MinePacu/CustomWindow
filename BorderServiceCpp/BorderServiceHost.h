@@ -1,50 +1,86 @@
 #pragma once
-#include <windows.h>
-#include <atomic>
-#include <string>
 
-// 단순 네이티브 BorderServiceHost (렌더링/DirectComposition 실제 구현은 후속 작업용 스텁)
-// C# P/Invoke 에서 요구하는 상태/설정 저장 및 업데이트 함수만 제공.
+#include <map>
 
-struct BS_Context;
+#include "VirtualDesktopUtils.h"
+#include "WindowBorder.h"
 
-// 로거 함수 (StdCall, wide string)
-typedef void(__stdcall* BS_LogFn)(int level, const wchar_t* message);
-
-struct BS_Context {
-    int argbColor;
-    int thickness;
-    int debug;
-    float partialRatio;
-    bool mergeEnabled;
-    BS_LogFn logger;
-
-    // 확장용 placeholder
-    BS_Context(int color, int t, int dbg)
-        : argbColor(color), thickness(t), debug(dbg), partialRatio(0.0f), mergeEnabled(false), logger(nullptr) {}
-
-    void Log(int level, const wchar_t* msg) {
-        if (logger) logger(level, msg);
-    }
+struct WinHookEvent
+{
+    DWORD event;
+    HWND hwnd;
+    LONG idObject;
+    LONG idChild;
+    DWORD idEventThread;
+    DWORD dwmsEventTime;
 };
 
-// Exported C API (cdecl)
-extern "C" {
-    __declspec(dllexport) BS_Context* BS_CreateContext(int argb, int thickness, int debug);
-    __declspec(dllexport) void BS_DestroyContext(BS_Context* ctx);
-    __declspec(dllexport) void BS_UpdateColor(BS_Context* ctx, int argb);
-    __declspec(dllexport) void BS_UpdateThickness(BS_Context* ctx, int t);
+class BorderServiceHost {
+public:
+    BorderServiceHost(DWORD mainThreadId);
+    ~BorderServiceHost();
 
-    struct BS_NativeRect { int Left, Top, Right, Bottom; };
-    __declspec(dllexport) void BS_UpdateRects(BS_Context* ctx, const BS_NativeRect* normal, int normalCount, const BS_NativeRect* top, int topCount);
-    __declspec(dllexport) void BS_ForceRedraw(BS_Context* ctx);
-    __declspec(dllexport) void BS_SetLogger(BS_Context* ctx, BS_LogFn logger);
-    __declspec(dllexport) void BS_SetPartialRatio(BS_Context* ctx, float ratio01);
-    __declspec(dllexport) void BS_EnableMerge(BS_Context* ctx, int enable);
-    // New: update target window list (layered overlay creation)
-    __declspec(dllexport) void BS_UpdateWindows(BS_Context* ctx, const HWND* hwnds, int count);
-}
+protected:
+    static LRESULT CALLBACK WndProc_Helper(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept
+    {
+        auto thisRef = reinterpret_cast<BorderServiceHost*>(GetWindowLongPtr(window, GWLP_USERDATA));
 
-// DLL 내 자동 실행 스레드 제어용 헬퍼
-void BS_Internal_StartDefaultIfNeeded();
-void BS_Internal_StopIfNeeded();
+        if (!thisRef && (message == WM_CREATE))
+        {
+            const auto createStruct = reinterpret_cast<LPCREATESTRUCT>(lparam);
+            thisRef = static_cast<BorderServiceHost*>(createStruct->lpCreateParams);
+            SetWindowLongPtr(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(thisRef));
+        }
+
+        return thisRef ? thisRef->WndProc(window, message, wparam, lparam) :
+            DefWindowProc(window, message, wparam, lparam);
+    }
+
+private:
+    static inline BorderServiceHost* s_instance = nullptr;
+    std::vector<HWINEVENTHOOK> m_staticWinEventHooks{};
+    VirtualDesktopUtils m_virtualDesktopUtils;
+
+    HWND m_window{ nullptr };
+    HINSTANCE m_hinstance;
+    std::map<HWND, std::unique_ptr<WindowBorder>> m_trackedWindow{};
+    HANDLE m_hPinEvent;
+    HANDLE m_hTerminateEvent;
+    DWORD m_mainThreadId;
+    std::thread m_thread;
+    bool m_running = true;
+
+    LRESULT WndProc(HWND, UINT, WPARAM, LPARAM) noexcept;
+    void HandleWinHookEvent(WinHookEvent* data) noexcept;
+
+    bool InitMainWindow();
+    void SubscribeToEvents();
+
+    void ProcessCommand(HWND window);
+    void StartTrackingTargetWindows();
+    void UnLockAll();
+    void CleanUp();
+
+    bool IsLocked(HWND window) const noexcept;
+
+    bool LockTrackWindow(HWND window) const noexcept;
+    bool UnlockTrackWindow(HWND window) const noexcept;
+    bool IsTracked(HWND window) const noexcept;
+    bool AssignBorder(HWND window);
+    void RefreshBorders();
+
+    static void CALLBACK WinHookProc(HWINEVENTHOOK winEventHook,
+        DWORD event,
+        HWND window,
+        LONG object,
+        LONG child,
+        DWORD eventThread,
+        DWORD eventTime)
+    {
+        WinHookEvent data{ event, window, object, child, eventThread, eventTime };
+        if (s_instance)
+        {
+            s_instance->HandleWinHookEvent(&data);
+        }
+    }
+};

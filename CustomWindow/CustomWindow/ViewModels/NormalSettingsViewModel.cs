@@ -38,7 +38,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 WindowTracker.Start();
                 // BorderService 실행
                 var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 색상
-                int thickness = 4;
+                int thickness = _config.BorderThickness;
                 BorderServiceHost.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 WindowTracker.AddExternalLog("AutoWindowChange ON: BorderService 기동 요청");
             }
@@ -87,7 +87,7 @@ public partial class NormalSettingsViewModel : ObservableObject
             {
                 BorderServiceHost.StopIfRunning();
                 var borderHex = _config.BorderColor ?? "#0078FF";
-                BorderServiceHost.StartIfNeeded(borderHex, 2, _config.Snapshot.ExcludedPrograms.ToArray());
+                BorderServiceHost.StartIfNeeded(borderHex, _config.BorderThickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 WindowTracker.AddExternalLog("Excluded 목록 변경 -> BorderService 재시작");
             }
         }

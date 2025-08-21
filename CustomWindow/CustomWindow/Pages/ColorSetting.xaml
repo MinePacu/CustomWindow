@@ -25,6 +25,11 @@
                         <controls:SettingsCard Header="투명">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderTransparency, Mode=TwoWay}"/>
                         </controls:SettingsCard>
+                        <controls:SettingsCard Header="테두리 두께" Description="픽셀 단위로 설정합니다 (1-10)">
+                            <NumberBox Value="{x:Bind ViewModel.BorderThickness, Mode=TwoWay}" 
+                                      Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" 
+                                      SmallChange="1" LargeChange="1" Width="120"/>
+                        </controls:SettingsCard>
                         <controls:SettingsCard Header="색 선택">
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <Border Width="110" Height="25" Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" CornerRadius="4"/>

@@ -15,11 +15,42 @@ public partial class ColorSettingsViewModel : ObservableObject
         {
             switch (name)
             {
-                case nameof(ObservableConfig.BorderColor): OnPropertyChanged(nameof(BorderColor)); OnPropertyChanged(nameof(BorderBrush)); break;
-                case nameof(ObservableConfig.CaptionColor): OnPropertyChanged(nameof(CaptionColor)); OnPropertyChanged(nameof(CaptionBrush)); break;
-                case nameof(ObservableConfig.CaptionTextColor): OnPropertyChanged(nameof(CaptionTextColor)); OnPropertyChanged(nameof(CaptionTextBrush)); break;
+                case nameof(ObservableConfig.BorderColor): 
+                    OnPropertyChanged(nameof(BorderColor)); 
+                    OnPropertyChanged(nameof(BorderBrush)); 
+                    UpdateBorderServiceColor();
+                    break;
+                case nameof(ObservableConfig.CaptionColor): 
+                    OnPropertyChanged(nameof(CaptionColor)); 
+                    OnPropertyChanged(nameof(CaptionBrush)); 
+                    break;
+                case nameof(ObservableConfig.CaptionTextColor): 
+                    OnPropertyChanged(nameof(CaptionTextColor)); 
+                    OnPropertyChanged(nameof(CaptionTextBrush)); 
+                    break;
+                case nameof(ObservableConfig.BorderThickness):
+                    OnPropertyChanged(nameof(BorderThickness));
+                    UpdateBorderServiceThickness();
+                    break;
             }
         };
+    }
+
+    private void UpdateBorderServiceColor()
+    {
+        if (_config.AutoWindowChange && BorderServiceHost.IsRunning)
+        {
+            var borderHex = _config.BorderColor ?? "#0078FF";
+            BorderServiceHost.UpdateColor(borderHex);
+        }
+    }
+
+    private void UpdateBorderServiceThickness()
+    {
+        if (_config.AutoWindowChange && BorderServiceHost.IsRunning)
+        {
+            BorderServiceHost.UpdateThickness(_config.BorderThickness);
+        }
     }
 
     private static Color HexToColor(string? hex, Color fallback)
@@ -87,6 +118,17 @@ public partial class ColorSettingsViewModel : ObservableObject
     public SolidColorBrush BorderBrush => new(BorderColor);
     public SolidColorBrush CaptionBrush => new(CaptionColor);
     public SolidColorBrush CaptionTextBrush => new(CaptionTextColor);
+
+    public int BorderThickness 
+    { 
+        get => _config.BorderThickness; 
+        set 
+        { 
+            if (_config.BorderThickness == value) return;
+            _config.BorderThickness = value; 
+            OnPropertyChanged(); 
+        } 
+    }
 
     public bool UseBorderSystemColor { get => _config.UseBorderSystemColor; set { _config.UseBorderSystemColor = value; OnPropertyChanged(); } }
     public bool UseBorderTransparency { get => _config.UseBorderTransparency; set { _config.UseBorderTransparency = value; OnPropertyChanged(); } }

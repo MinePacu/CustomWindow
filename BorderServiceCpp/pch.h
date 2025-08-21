@@ -9,5 +9,22 @@
 
 // 여기에 미리 컴파일하려는 헤더 추가
 #include "framework.h"
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <optional>
+#include <d2d1.h>
+#include <d2d1_1.h>
+#include <dwrite.h>
+#include <wtsapi32.h>
+#include <dbt.h>
+#include <dwmapi.h>
+
+#pragma comment(lib, "wtsapi32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 #endif //PCH_H

@@ -18,6 +18,9 @@ public sealed class AppConfig
     public bool UseCaptionTextTransparency { get; set; }
     public string? CaptionTextColorMode { get; set; }
     public string? CaptionColorMode { get; set; }
+    
+    // Border thickness setting
+    public int BorderThickness { get; set; } = 2;
 
     // Normal settings
     public bool AutoWindowChange { get; set; }

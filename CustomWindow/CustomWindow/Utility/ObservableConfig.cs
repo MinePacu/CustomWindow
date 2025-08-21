@@ -37,6 +37,7 @@ public sealed partial class ObservableConfig : INotifyPropertyChanged
     public bool UseCaptionTextTransparency { get => _cfg.UseCaptionTextTransparency; set => Set(_cfg.UseCaptionTextTransparency, value, v => _cfg.UseCaptionTextTransparency = v, nameof(UseCaptionTextTransparency)); }
     public string? CaptionTextColorMode { get => _cfg.CaptionTextColorMode; set => Set(_cfg.CaptionTextColorMode, value, v => _cfg.CaptionTextColorMode = v, nameof(CaptionTextColorMode)); }
     public string? CaptionColorMode { get => _cfg.CaptionColorMode; set => Set(_cfg.CaptionColorMode, value, v => _cfg.CaptionColorMode = v, nameof(CaptionColorMode)); }
+    public int BorderThickness { get => _cfg.BorderThickness; set => Set(_cfg.BorderThickness, value, v => _cfg.BorderThickness = v, nameof(BorderThickness)); }
     public bool AutoWindowChange { get => _cfg.AutoWindowChange; set => Set(_cfg.AutoWindowChange, value, v => _cfg.AutoWindowChange = v, nameof(AutoWindowChange)); }
     public string? WindowCornerMode { get => _cfg.WindowCornerMode; set => Set(_cfg.WindowCornerMode, value, v => _cfg.WindowCornerMode = v, nameof(WindowCornerMode)); }
     public bool AutoAdmin { get => _cfg.AutoAdmin; set => Set(_cfg.AutoAdmin, value, v => _cfg.AutoAdmin = v, nameof(AutoAdmin)); }

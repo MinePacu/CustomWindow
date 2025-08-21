@@ -1,310 +1,357 @@
 #include "pch.h"
+ 
+#include "dpi_aware.h"
 #include "BorderServiceHost.h"
-#include <mutex>
-#include <thread>
-#include <vector>
-#include <unordered_map>
+#include "game_mode.h"
 
-static std::mutex g_ctxMutex;
-static BS_Context* g_autoCtx = nullptr;
-static std::thread g_worker;
-static std::atomic<bool> g_running{ false };
-static HANDLE g_startEvent = nullptr;
-static HANDLE g_stopEvent = nullptr;
+extern "C" IMAGE_DOS_HEADER __ImageBase;
 
-// overlay tracking
-struct OverlayInfo {
-    HWND target = nullptr; // original window
-    HWND overlay = nullptr; // layered border window
-    RECT lastRect{};
-};
-
-static std::unordered_map<HWND, OverlayInfo> g_overlays; // key: target hwnd
-
-static void DestroyOverlay(OverlayInfo& oi)
+namespace NonLocalizable
 {
-    if (oi.overlay && IsWindow(oi.overlay))
-        DestroyWindow(oi.overlay);
-    oi.overlay = nullptr;
+    const static wchar_t* TOOL_WINDOW_CLASS_NAME = L"BorderServiceWindow";
+    const static wchar_t* WINDOW_IS_LOCKED_PROP = L"BorderService_locked";
 }
 
-static void EnsureOverlayFor(HWND target, BS_Context* ctx)
+BorderServiceHost::BorderServiceHost(DWORD mainThreadId) :
+    m_hinstance(reinterpret_cast<HINSTANCE>(&__ImageBase)),
+    m_mainThreadId(mainThreadId)
 {
-    if (!IsWindow(target) || !IsWindowVisible(target)) return;
-    if (g_overlays.find(target) != g_overlays.end()) return;
+    s_instance = this;
+    DPIAware::EnableDPIAwarenessForThisProcess();
 
-    RECT rc; if (!GetWindowRect(target, &rc)) return;
-
-    HWND overlay = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-        L"STATIC", L"", WS_POPUP,
-        rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-        nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
-    if (!overlay) return;
-
-    // make click-through
-    SetWindowLongPtrW(overlay, GWL_EXSTYLE,
-        GetWindowLongPtrW(overlay, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
-
-    // initial paint
-    HDC hdc = GetDC(overlay);
-    if (hdc)
+    if (InitMainWindow())
     {
-        // simple hollow rect painting via layered API
-        HDC memDC = CreateCompatibleDC(hdc);
-        RECT r = { 0,0, rc.right - rc.left, rc.bottom - rc.top };
-        BITMAPINFO bi{}; bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bi.bmiHeader.biWidth = r.right;
-        bi.bmiHeader.biHeight = -r.bottom; // top-down
-        bi.bmiHeader.biPlanes = 1;
-        bi.bmiHeader.biBitCount = 32;
-        bi.bmiHeader.biCompression = BI_RGB;
-        void* bits = nullptr;
-        HBITMAP bmp = CreateDIBSection(hdc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-        if (bmp)
+        //InitializeWinhookEventIds();
+
+        SubscribeToEvents();
+        StartTrackingTargetWindows();
+    }
+    else
+    {
+        //Logger::error("Failed to init AlwaysOnTop module");
+        // TODO: show localized message
+    }
+}
+
+BorderServiceHost::~BorderServiceHost()
+{
+    m_running = false;
+    m_thread.join();
+
+    CleanUp();
+}
+
+bool BorderServiceHost::InitMainWindow()
+{
+    WNDCLASSEXW wcex{};
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.lpfnWndProc = WndProc_Helper;
+    wcex.hInstance = m_hinstance;
+    wcex.lpszClassName = NonLocalizable::TOOL_WINDOW_CLASS_NAME;
+    RegisterClassExW(&wcex);
+
+    m_window = CreateWindowExW(WS_EX_TOOLWINDOW, NonLocalizable::TOOL_WINDOW_CLASS_NAME, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, m_hinstance, this);
+    if (!m_window)
+    {
+        // error log
+        return false;
+    }
+
+    return true;
+}
+
+LRESULT BorderServiceHost::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept
+{
+    return 0;
+}
+
+void BorderServiceHost::ProcessCommand(HWND window)
+{
+    //if targetwindow is in gamemode, disable border
+    bool gameMode = detect_game_mode();
+    if (gameMode)
+    {
+        return;
+    }
+
+    bool trackedwindow = IsLocked(window);
+    if (trackedwindow)
+    {
+        if (UnlockTrackWindow(window))
         {
-            HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
-            auto color = ctx ? ctx->argbColor : 0xFFFF0000; // ARGB
-            BYTE a = (color >> 24) & 0xFF;
-            BYTE rC = (color >> 16) & 0xFF;
-            BYTE gC = (color >> 8) & 0xFF;
-            BYTE bC = (color) & 0xFF;
-            int t = ctx ? ctx->thickness : 2;
-            // fill transparent
-            memset(bits, 0, r.right * r.bottom * 4);
-            // draw border pixels (no AA)
-            for (int y = 0; y < r.bottom; ++y)
+            auto iter = m_trackedWindow.find(window);
+            if (iter != m_trackedWindow.end())
             {
-                for (int x = 0; x < r.right; ++x)
-                {
-                    bool edge = (x < t) || (x >= r.right - t) || (y < t) || (y >= r.bottom - t);
-                    if (edge)
-                    {
-                        BYTE* p = (BYTE*)bits + (y * r.right + x) * 4;
-                        p[0] = bC; p[1] = gC; p[2] = rC; p[3] = a;
-                    }
-                }
+                m_trackedWindow.erase(iter);
             }
-            POINT srcPos{ 0,0 };
-            SIZE size{ r.right, r.bottom };
-            POINT dstPos{ rc.left, rc.top };
-            BLENDFUNCTION bf{ AC_SRC_OVER,0,255,AC_SRC_ALPHA };
-            UpdateLayeredWindow(overlay, nullptr, &dstPos, &size, memDC, &srcPos, 0, &bf, ULW_ALPHA);
-            SelectObject(memDC, old);
-            DeleteObject(bmp);
+
         }
-        DeleteDC(memDC);
-        ReleaseDC(overlay, hdc);
     }
-    ShowWindow(overlay, SW_SHOWNOACTIVATE);
-    SetWindowPos(overlay, HWND_TOPMOST, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
-
-    OverlayInfo info; info.target = target; info.overlay = overlay; info.lastRect = rc;
-    g_overlays[target] = info;
-}
-
-static void UpdateOverlayGeometry(OverlayInfo& oi, BS_Context* ctx)
-{
-    if (!IsWindow(oi.target) || !IsWindow(oi.overlay)) return;
-    RECT rc; if (!GetWindowRect(oi.target, &rc)) return;
-    if (EqualRect(&rc, &oi.lastRect)) return;
-    oi.lastRect = rc;
-    SetWindowPos(oi.overlay, HWND_TOPMOST, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-        SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
-    // TODO: optionally repaint if size changed
-}
-
-static void RepaintOverlay(OverlayInfo& oi, BS_Context* ctx)
-{
-    if (!IsWindow(oi.overlay) || !IsWindow(oi.target)) return;
-    RECT rc; if (!GetWindowRect(oi.target, &rc)) return;
-    int width = rc.right - rc.left;
-    int height = rc.bottom - rc.top;
-    HDC hdc = GetDC(oi.overlay);
-    if (!hdc) return;
-    HDC memDC = CreateCompatibleDC(hdc);
-    BITMAPINFO bi{}; bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bi.bmiHeader.biWidth = width; bi.bmiHeader.biHeight = -height; bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32; bi.bmiHeader.biCompression = BI_RGB;
-    void* bits = nullptr;
-    HBITMAP bmp = CreateDIBSection(hdc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-    if (bmp)
+    else
     {
-        HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
-        auto color = ctx ? ctx->argbColor : 0xFFFF0000;
-        BYTE a = (color >> 24) & 0xFF;
-        BYTE rC = (color >> 16) & 0xFF;
-        BYTE gC = (color >> 8) & 0xFF;
-        BYTE bC = (color) & 0xFF;
-        int t = ctx ? ctx->thickness : 2;
-        memset(bits, 0, width * height * 4);
-        for (int y = 0; y < height; ++y)
+        if (LockTrackWindow(window))
         {
-            for (int x = 0; x < width; ++x)
+            AssignBorder(window);
+        }
+    }
+}
+
+void BorderServiceHost::StartTrackingTargetWindows()
+{
+    using result_t = std::vector<HWND>;
+    result_t result;
+
+    auto enumWindows = [](HWND hwnd, LPARAM param) -> BOOL {
+        if (!IsWindowVisible(hwnd))
+        {
+            return TRUE;
+        }
+
+        auto windowName = GetWindowTextLength(hwnd);
+        if (windowName > 0)
+        {
+            result_t& result = *reinterpret_cast<result_t*>(param);
+            result.push_back(hwnd);
+        }
+
+        return TRUE;
+        };
+
+    EnumWindows(enumWindows, reinterpret_cast<LPARAM>(&result));
+
+    for (HWND window : result)
+    {
+        if (IsPinned(window))
+        {
+            AssignBorder(window);
+        }
+    }
+}
+
+bool BorderServiceHost::AssignBorder(HWND window)
+{
+    if (m_virtualDesktopUtils.IsWindowOnCurrentDesktop(window))
+    {
+        auto border = WindowBorder::Create(window, m_hinstance);
+        if (border)
+        {
+            m_trackedWindow[window] = std::move(border);
+        }
+    }
+    else
+    {
+        m_trackedWindow[window] = nullptr;
+    }
+
+    return true;
+}
+
+void BorderServiceHost::SubscribeToEvents()
+{
+    // subscribe to windows events
+    DWORD events_to_subscribe[7] = {
+        EVENT_OBJECT_LOCATIONCHANGE,
+        EVENT_SYSTEM_MINIMIZESTART,
+        EVENT_SYSTEM_MINIMIZEEND,
+        EVENT_SYSTEM_MOVESIZEEND,
+        EVENT_SYSTEM_FOREGROUND,
+        EVENT_OBJECT_DESTROY,
+        EVENT_OBJECT_FOCUS,
+    };
+
+    for (int i = 0; i < 7; ++i)
+    {
+        auto event = events_to_subscribe[i];
+        auto hook = SetWinEventHook(event, event, nullptr, WinHookProc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+        if (hook)
+        {
+            m_staticWinEventHooks.emplace_back(hook);
+        }
+        else
+        {
+            //Logger::error(L"Failed to set win event hook");
+        }
+    }
+}
+
+void BorderServiceHost::UnLockAll()
+{
+    for (const auto& [topWindow, border] : m_trackedWindow)
+    {
+        if (!UnlockTrackWindow(topWindow))
+        {
+            //Logger::error(L"Unpinning topmost window failed");
+        }
+    }
+
+    m_trackedWindow.clear();
+}
+
+void BorderServiceHost::CleanUp()
+{
+    UnLockAll();
+    if (m_window)
+    {
+        DestroyWindow(m_window);
+        m_window = nullptr;
+    }
+
+    UnregisterClass(NonLocalizable::TOOL_WINDOW_CLASS_NAME, reinterpret_cast<HINSTANCE>(&__ImageBase));
+}
+
+bool BorderServiceHost::IsLocked(HWND window) const noexcept
+{
+    auto handle = GetProp(window, NonLocalizable::WINDOW_IS_LOCKED_PROP);
+    return (handle != NULL);
+}
+
+bool BorderServiceHost::LockTrackWindow(HWND window) const noexcept
+{
+    if (!SetProp(window, NonLocalizable::WINDOW_IS_LOCKED_PROP, reinterpret_cast<HANDLE>(1)))
+    {
+        //Logger::error(L"SetProp failed, {}", get_last_error_or_default(GetLastError()));
+    }
+
+    auto res = SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    if (!res)
+    {
+        //Logger::error(L"Failed to pin window, {}", get_last_error_or_default(GetLastError()));
+    }
+
+    return res;
+}
+
+bool BorderServiceHost::UnlockTrackWindow(HWND window) const noexcept
+{
+    RemoveProp(window, NonLocalizable::WINDOW_IS_LOCKED_PROP);
+    auto res = SetWindowPos(window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    if (!res)
+    {
+        //Logger::error(L"Failed to unpin window, {}", get_last_error_or_default(GetLastError()));
+    }
+
+    return res;
+}
+
+bool BorderServiceHost::IsTracked(HWND window) const noexcept
+{
+    auto iter = m_trackedWindow.find(window);
+    return (iter != m_trackedWindow.end());
+}
+
+void BorderServiceHost::HandleWinHookEvent(WinHookEvent* data) noexcept
+{
+    if (!data->hwnd)
+    {
+        return;
+    }
+
+    std::vector<HWND> toErase{};
+    for (const auto& [window, border] : m_trackedWindow)
+    {
+        // check if the window was closed, since for some EVENT_OBJECT_DESTROY doesn't work
+        // fixes https://github.com/microsoft/PowerToys/issues/15300
+        bool visible = IsWindowVisible(window);
+        if (!visible)
+        {
+            UnlockTrackWindow(window);
+            toErase.push_back(window);
+        }
+    }
+
+    for (const auto window : toErase)
+    {
+        m_trackedWindow.erase(window);
+    }
+
+    switch (data->event)
+    {
+    case EVENT_OBJECT_LOCATIONCHANGE:
+    {
+        auto iter = m_trackedWindow.find(data->hwnd);
+        if (iter != m_trackedWindow.end())
+        {
+            const auto& border = iter->second;
+            if (border)
             {
-                bool edge = (x < t) || (x >= width - t) || (y < t) || (y >= height - t);
-                if (edge)
-                {
-                    BYTE* p = (BYTE*)bits + (y * width + x) * 4;
-                    p[0] = bC; p[1] = gC; p[2] = rC; p[3] = a;
-                }
-            }
-        }
-        POINT srcPos{ 0,0 }; SIZE size{ width,height }; POINT dstPos{ rc.left, rc.top }; BLENDFUNCTION bf{ AC_SRC_OVER,0,255,AC_SRC_ALPHA };
-        UpdateLayeredWindow(oi.overlay, nullptr, &dstPos, &size, memDC, &srcPos, 0, &bf, ULW_ALPHA);
-        SelectObject(memDC, old);
-        DeleteObject(bmp);
-    }
-    DeleteDC(memDC);
-    ReleaseDC(oi.overlay, hdc);
-}
-
-extern "C" {
-
-BS_Context* BS_CreateContext(int argb, int thickness, int debug)
-{
-    auto ctx = new (std::nothrow) BS_Context(argb, thickness, debug);
-    if (ctx)
-        ctx->Log(0, L"BS_CreateContext OK");
-    return ctx;
-}
-
-void BS_DestroyContext(BS_Context* ctx)
-{
-    if (!ctx) return;
-    ctx->Log(0, L"BS_DestroyContext");
-    // destroy overlays
-    for (auto& kv : g_overlays) {
-        DestroyOverlay(kv.second);
-    }
-    g_overlays.clear();
-    delete ctx;
-}
-
-void BS_UpdateColor(BS_Context* ctx, int argb)
-{
-    if (!ctx) return;
-    ctx->argbColor = argb;
-    ctx->Log(0, L"BS_UpdateColor");
-    for (auto& kv : g_overlays) RepaintOverlay(kv.second, ctx);
-}
-
-void BS_UpdateThickness(BS_Context* ctx, int t)
-{
-    if (!ctx) return;
-    ctx->thickness = t;
-    ctx->Log(0, L"BS_UpdateThickness");
-    for (auto& kv : g_overlays) RepaintOverlay(kv.second, ctx);
-}
-
-void BS_UpdateRects(BS_Context* ctx, const BS_NativeRect* normal, int normalCount, const BS_NativeRect* top, int topCount)
-{
-    if (!ctx) return;
-    ctx->Log(0, L"BS_UpdateRects (unused stub)");
-}
-
-void BS_ForceRedraw(BS_Context* ctx)
-{
-    if (!ctx) return;
-    ctx->Log(0, L"BS_ForceRedraw");
-    for (auto& kv : g_overlays) RepaintOverlay(kv.second, ctx);
-}
-
-void BS_SetLogger(BS_Context* ctx, BS_LogFn logger)
-{
-    if (!ctx) return;
-    ctx->logger = logger;
-    ctx->Log(0, L"BS_SetLogger");
-}
-
-void BS_SetPartialRatio(BS_Context* ctx, float ratio01)
-{
-    if (!ctx) return;
-    ctx->partialRatio = ratio01;
-    ctx->Log(0, L"BS_SetPartialRatio");
-}
-
-void BS_EnableMerge(BS_Context* ctx, int enable)
-{
-    if (!ctx) return;
-    ctx->mergeEnabled = (enable != 0);
-    ctx->Log(0, L"BS_EnableMerge");
-}
-
-void BS_UpdateWindows(BS_Context* ctx, const HWND* hwnds, int count)
-{
-    if (!ctx) return;
-    ctx->Log(0, L"BS_UpdateWindows");
-    // mark existing
-    std::unordered_map<HWND, bool> stillPresent;
-    for (auto& kv : g_overlays) stillPresent[kv.first] = false;
-
-    for (int i = 0; i < count; ++i)
-    {
-        HWND h = hwnds[i];
-        if (!IsWindow(h)) continue;
-        stillPresent[h] = true; // exists or new
-        if (g_overlays.find(h) == g_overlays.end())
-        {
-            EnsureOverlayFor(h, ctx);
-        }
-    }
-    // destroy those not present
-    for (auto it = g_overlays.begin(); it != g_overlays.end(); )
-    {
-        if (!stillPresent[it->first])
-        {
-            DestroyOverlay(it->second);
-            it = g_overlays.erase(it);
-        }
-        else ++it;
-    }
-    // update geometry for remaining
-    for (auto& kv : g_overlays)
-        UpdateOverlayGeometry(kv.second, ctx);
-}
-}
-
-static void WorkerProc()
-{
-    while (g_running.load())
-    {
-        HANDLE handles[2] = { g_stopEvent, g_startEvent };
-        DWORD wait = WaitForMultipleObjects(2, handles, FALSE, 500);
-        if (wait == WAIT_OBJECT_0) // stop
-            break;
-        if (wait == WAIT_OBJECT_0 + 1) // start event (unused now)
-        {
-            std::lock_guard<std::mutex> lock(g_ctxMutex);
-            if (!g_autoCtx)
-            {
-                g_autoCtx = BS_CreateContext(0xFF0078FF, 2, 0);
+                border->UpdateBorderPosition();
             }
         }
-        // Could poll here if needed
     }
-    std::lock_guard<std::mutex> lock(g_ctxMutex);
-    if (g_autoCtx)
+    break;
+    case EVENT_SYSTEM_MINIMIZESTART:
     {
-        BS_DestroyContext(g_autoCtx);
-        g_autoCtx = nullptr;
+        auto iter = m_trackedWindow.find(data->hwnd);
+        if (iter != m_trackedWindow.end())
+        {
+            m_trackedWindow[data->hwnd] = nullptr;
+        }
+    }
+    break;
+    case EVENT_SYSTEM_MINIMIZEEND:
+    {
+        auto iter = m_trackedWindow.find(data->hwnd);
+        if (iter != m_trackedWindow.end())
+        {
+            LockTrackWindow(data->hwnd);
+            AssignBorder(data->hwnd);
+        }
+    }
+    break;
+    case EVENT_SYSTEM_MOVESIZEEND:
+    {
+        auto iter = m_trackedWindow.find(data->hwnd);
+        if (iter != m_trackedWindow.end())
+        {
+            const auto& border = iter->second;
+            if (border)
+            {
+                border->UpdateBorderPosition();
+            }
+        }
+    }
+    break;
+    case EVENT_SYSTEM_FOREGROUND:
+    {
+        RefreshBorders();
+    }
+    break;
+    case EVENT_OBJECT_FOCUS:
+    {
+        for (const auto& [window, border] : m_trackedWindow)
+        {
+            // check if topmost was reset
+            // fixes https://github.com/microsoft/PowerToys/issues/19168
+            if (!LockTrackWindow(window))
+            {
+                //Logger::trace(L"A window no longer has Lock set and it should. Setting Lock again.");
+                LockTrackWindow(window);
+            }
+        }
+    }
+    break;
+    default:
+        break;
     }
 }
 
-void BS_Internal_StartDefaultIfNeeded()
+void BorderServiceHost::RefreshBorders()
 {
-    if (g_running.load()) return;
-    g_startEvent = CreateEventW(nullptr, FALSE, FALSE, L"Global\\BorderServiceCpp.Start");
-    g_stopEvent = CreateEventW(nullptr, FALSE, FALSE, L"Global\\BorderServiceCpp.Stop");
-    g_running = true;
-    g_worker = std::thread(WorkerProc);
-}
-
-void BS_Internal_StopIfNeeded()
-{
-    if (!g_running.load()) return;
-    SetEvent(g_stopEvent);
-    g_running = false;
-    if (g_worker.joinable()) g_worker.join();
-    if (g_startEvent) { CloseHandle(g_startEvent); g_startEvent = nullptr; }
-    if (g_stopEvent)  { CloseHandle(g_stopEvent);  g_stopEvent  = nullptr; }
+    for (const auto& [window, border] : m_trackedWindow)
+    {
+        if (m_virtualDesktopUtils.IsWindowOnCurrentDesktop(window))
+        {
+            if (!border)
+            {
+                AssignBorder(window);
+            }
+        }
+        else
+        {
+            if (border)
+            {
+                m_trackedWindow[window] = nullptr;
+            }
+        }
+    }
 }

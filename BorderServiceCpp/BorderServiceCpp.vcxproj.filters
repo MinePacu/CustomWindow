@@ -24,6 +24,18 @@
     <ClInclude Include="BorderServiceHost.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="WindowBorder.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameDrawer.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="dpi_aware.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="game_mode.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -35,5 +47,26 @@
     <ClCompile Include="BorderServiceHost.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="FrameDrawer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowBorder.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="VirtualDesktopUtils.h">
+      <Filter>헤더 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="VirualDesktopUtil.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="dpi_aware.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="BorderServiceHost_new.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
