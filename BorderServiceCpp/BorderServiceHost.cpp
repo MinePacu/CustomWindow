@@ -121,7 +121,7 @@ void BorderServiceHost::StartTrackingTargetWindows()
 
     for (HWND window : result)
     {
-        if (IsPinned(window))
+        if (IsTracked(window))
         {
             AssignBorder(window);
         }
@@ -320,8 +320,7 @@ void BorderServiceHost::HandleWinHookEvent(WinHookEvent* data) noexcept
     {
         for (const auto& [window, border] : m_trackedWindow)
         {
-            // check if topmost was reset
-            // fixes https://github.com/microsoft/PowerToys/issues/19168
+            // check if Locker was reset
             if (!LockTrackWindow(window))
             {
                 //Logger::trace(L"A window no longer has Lock set and it should. Setting Lock again.");

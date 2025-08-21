@@ -131,7 +131,7 @@ void FrameDrawer::SetBorderRect(RECT windowRect, COLORREF rgb, float alpha, int 
         {
             if (!CreateRenderTargets(clientRect))
             {
-                Logger::error(L"Failed to create render targets");
+                //Logger::error(L"Failed to create render targets");
             }
         }
         else

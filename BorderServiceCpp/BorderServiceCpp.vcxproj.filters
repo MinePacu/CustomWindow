@@ -36,6 +36,9 @@
     <ClInclude Include="game_mode.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="ScalingUtils.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -62,11 +65,15 @@
     <ClCompile Include="dpi_aware.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="BorderServiceHost_new.cpp">
+    <ClCompile Include="ScalingUtils.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="$(MSBuildThisFileDirectory)..\..\natvis\wil.natvis" />
+    <Natvis Include="$(MSBuildThisFileDirectory)..\..\natvis\wil.natstepfilter" />
   </ItemGroup>
 </Project>

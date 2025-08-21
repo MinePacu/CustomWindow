@@ -142,11 +142,11 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="game_mode.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ScalingUtils.h" />
     <ClInclude Include="WindowBorder.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BorderServiceHost.cpp" />
-    <ClCompile Include="BorderServiceHost_new.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="dpi_aware.cpp" />
     <ClCompile Include="FrameDrawer.cpp" />
@@ -156,6 +156,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ScalingUtils.cpp" />
     <ClCompile Include="VirualDesktopUtil.cpp" />
     <ClCompile Include="VirtualDesktopUtils.h" />
     <ClCompile Include="WindowBorder.cpp" />
