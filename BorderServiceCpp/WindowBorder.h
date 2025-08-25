@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Settings.h"
+
 class FrameDrawer;
 
 class WindowBorder
@@ -13,6 +15,7 @@ public:
 
     void UpdateBorderPosition() const;
     void UpdateBorderProperties() const;
+    void SettingsUpdate(SettingId id);  // Add this declaration
 
 protected:
     static LRESULT CALLBACK s_WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept

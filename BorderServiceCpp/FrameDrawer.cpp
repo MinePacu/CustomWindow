@@ -3,7 +3,7 @@
 
 #include <dwmapi.h>
 
-#include <ScalingUtils.h>
+#include "ScalingUtils.h"
 
 namespace
 {

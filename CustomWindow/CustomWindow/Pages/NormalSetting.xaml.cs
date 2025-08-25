@@ -11,21 +11,35 @@ namespace CustomWindow.Pages
         public NormalSettingsViewModel ViewModel { get; }
         public NormalSetting()
         {
-            // ViewModel 를 먼저 생성하여 x:Bind 가 초기 로드 시 null 참조되지 않도록 함
+            // ViewModel 을 먼저 생성하여 x:Bind 시 초기 로드 때 null 참조가 아니도록 함
             ViewModel = new NormalSettingsViewModel(App.ConfigStore!.Config);
             InitializeComponent();
             DataContext = ViewModel;
             Loaded += NormalSetting_Loaded;
             Unloaded += NormalSetting_Unloaded;
+            
+            // 로그 이벤트 구독
             WindowTracker.LogAdded += WindowTracker_LogAdded;
+            BorderService.LogReceived += BorderService_LogReceived;
         }
 
         private void NormalSetting_Unloaded(object sender, RoutedEventArgs e)
         {
             WindowTracker.LogAdded -= WindowTracker_LogAdded;
+            BorderService.LogReceived -= BorderService_LogReceived;
         }
 
         private void WindowTracker_LogAdded(string line)
+        {
+            AddLogToTextBox(line);
+        }
+
+        private void BorderService_LogReceived(string line)
+        {
+            AddLogToTextBox(line);
+        }
+
+        private void AddLogToTextBox(string line)
         {
             // UI 스레드에 안전하게 반영
             DispatcherQueue.TryEnqueue(() =>
@@ -52,7 +66,7 @@ namespace CustomWindow.Pages
             }
             if (AutoAdminToggle is not null)
             {
-                AutoAdminToggle.IsEnabled = isAdmin; // 관리자 아니면 자동 관리자 토글 비활성화
+                AutoAdminToggle.IsEnabled = isAdmin; // 관리자 아니면 자동 관리자 설정 비활성화
             }
 
             RefreshLogs();

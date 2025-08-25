@@ -5,14 +5,14 @@
 #include "winrt/Windows.Foundation.h"
 
 #include "FrameDrawer.h"
-#include <ScalingUtils.h>
-#include <Settings.h>
-#include <WindowCornersUtil.h>
+#include "ScalingUtils.h"
+
+#include <wil/resource.h>
 
 // Non-Localizable strings
 namespace NonLocalizable
 {
-    const wchar_t ToolWindowClassName[] = L"AlwaysOnTop_Border";
+    const wchar_t ToolWindowClassName[] = L"BorderService_Border";
 }
 
 std::optional<RECT> GetFrameRect(HWND window)
@@ -193,7 +193,9 @@ void WindowBorder::UpdateBorderProperties() const
 
     RECT frameRect{ 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top };
 
-    COLORREF color;
+    
+    COLORREF color = RGB(0, 0, 255);
+    /*
     if (AlwaysOnTopSettings::settings().frameAccentColor)
     {
         winrt::Windows::UI::ViewManagement::UISettings settings;
@@ -204,16 +206,17 @@ void WindowBorder::UpdateBorderProperties() const
     {
         color = AlwaysOnTopSettings::settings().frameColor;
     }
-
-    float opacity = AlwaysOnTopSettings::settings().frameOpacity / 100.0f;
+    */
+    float opacity = 100.0f;
     float scalingFactor = ScalingUtils::ScalingFactor(m_trackingWindow);
-    float thickness = AlwaysOnTopSettings::settings().frameThickness * scalingFactor;
+    float thickness = 4 * scalingFactor;
     float cornerRadius = 0.0;
+    /*
     if (AlwaysOnTopSettings::settings().roundCornersEnabled)
     {
         cornerRadius = WindowCornerUtils::CornersRadius(m_trackingWindow) * scalingFactor;
     }
-
+    */
     m_frameDrawer->SetBorderRect(frameRect, color, opacity, static_cast<int>(thickness), cornerRadius);
 }
 
@@ -257,6 +260,7 @@ LRESULT WindowBorder::WndProc(UINT message, WPARAM wparam, LPARAM lparam) noexce
     return FALSE;
 }
 
+/*
 void WindowBorder::SettingsUpdate(SettingId id)
 {
     if (!AlwaysOnTopSettings::settings().enableFrame)
@@ -292,3 +296,4 @@ void WindowBorder::SettingsUpdate(SettingId id)
         break;
     }
 }
+*/

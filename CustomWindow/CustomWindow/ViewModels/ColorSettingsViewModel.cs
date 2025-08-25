@@ -38,18 +38,18 @@ public partial class ColorSettingsViewModel : ObservableObject
 
     private void UpdateBorderServiceColor()
     {
-        if (_config.AutoWindowChange && BorderServiceHost.IsRunning)
+        if (_config.AutoWindowChange && BorderService.IsRunning)
         {
             var borderHex = _config.BorderColor ?? "#0078FF";
-            BorderServiceHost.UpdateColor(borderHex);
+            BorderService.UpdateColor(borderHex);
         }
     }
 
     private void UpdateBorderServiceThickness()
     {
-        if (_config.AutoWindowChange && BorderServiceHost.IsRunning)
+        if (_config.AutoWindowChange && BorderService.IsRunning)
         {
-            BorderServiceHost.UpdateThickness(_config.BorderThickness);
+            BorderService.UpdateThickness(_config.BorderThickness);
         }
     }
 

@@ -5,10 +5,10 @@ using System.Drawing; // Color 구조체 (System.Drawing.Primitives)
 namespace CustomWindow.Utility;
 
 /// <summary>
-/// 지정 HWND 주변에 얇은 테두리(overlay) 창을 만들고 대상 창 이동/사이즈/표시 상태 변화에 따라 자동으로 동기화.
-/// 이전 구현에서 owner 로 대상 HWND 를 직접 지정 + TopMost 동기화를 주기적으로 강제하면서
-/// 다수 창 처리 시 Z-Order 재배치가 잦아 깜빡임이 발생. (윈도우와 테두리가 번갈아 앞으로/뒤로)
-/// 개선: owner 관계 제거(독립 popup), 필요할 때만 Z-Order 조정, 대상 바로 위에만 위치.
+/// 특정 HWND 주변에 색상 테두리(overlay) 창을 생성하여 해당 창 이동/크기변경/표시 상태 변화에 따라 자동으로 동기화.
+/// 기존 방법에서 owner 를 쓸 경우 HWND 의 최상위 창인 + TopMost 동기화가 복잡하므로
+/// 대신 창 자체의 Z-Order 위치를 계산 변경으로 정확한 겹침을 방지. (상위에 테두리를 윗면에/아래로)
+/// 특징: owner 없이 동작(완전 popup), 필요한 때만 Z-Order 조정, 빠른 바로 업데이트 위치.
 /// </summary>
 public sealed class WindowHighlighter : IDisposable
 {
@@ -23,7 +23,7 @@ public sealed class WindowHighlighter : IDisposable
 
     private static readonly string OverlayClassName = "WindowHighlighterOverlayClass";
     private static ushort _classAtom;
-    private static WndProcDelegate? _wndProcStatic; // 정적 보관 (GC 방지)
+    private static WndProcDelegate? _wndProcStatic; // 정적 참조 (GC 방지)
 
     // Region 캐시
     private IntPtr _currentRegion = IntPtr.Zero;
@@ -32,7 +32,6 @@ public sealed class WindowHighlighter : IDisposable
 
     // Z-Order 상태 캐시
     private bool _lastTargetTopMost;
-    private IntPtr _lastPrevAbove; // Target 위(앞) 윈도우 (GW_HWNDPREV). Overlay 가 그 사이에 있으면 안정.
 
     static WindowHighlighter()
     {
@@ -58,7 +57,7 @@ public sealed class WindowHighlighter : IDisposable
             Native.InvalidateRect(_overlayHwnd, IntPtr.Zero, false);
     }
 
-    // 외부(주기)에서 요청 시 위치/크기/Region + 필요 Z-Order 재확인
+    // 외부(주기)에서 요청 시 위치/크기/Region + 필요 Z-Order 정확화
     public void Refresh() => UpdateBounds();
 
     public void ReorderOnly()
@@ -100,7 +99,7 @@ public sealed class WindowHighlighter : IDisposable
 
     private void CreateOverlay()
     {
-        // owner(부모) 를 target 로 지정하지 않는다. (지정하면 owner chain 재배열 시 깜빡임 증가)
+        // owner(부모) 를 target 로 지정하지 않는다. (지정하면 owner chain 배열 및 깜빡임 현상)
         _overlayHwnd = Native.CreateWindowEx(
             WindowStylesEx.WS_EX_LAYERED |
             WindowStylesEx.WS_EX_TRANSPARENT |
@@ -110,7 +109,7 @@ public sealed class WindowHighlighter : IDisposable
             string.Empty,
             WindowStyles.WS_POPUP,
             0, 0, 0, 0,
-            IntPtr.Zero, // <-- parent 제거
+            IntPtr.Zero, // <-- parent 없음
             IntPtr.Zero, Native.GetModuleHandle(null), IntPtr.Zero);
 
         if (_overlayHwnd == IntPtr.Zero)
@@ -139,7 +138,7 @@ public sealed class WindowHighlighter : IDisposable
         IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
         if (hwnd != _targetHwnd) return;
-        if (idObject != 0) return; // window 자체
+        if (idObject != 0) return; // window 객체
         switch (eventType)
         {
             case EventConstants.EVENT_OBJECT_LOCATIONCHANGE:
@@ -172,7 +171,7 @@ public sealed class WindowHighlighter : IDisposable
             return;
         }
         EnsureZOrder();
-        // 위치/크기만 갱신 (z-order 건드리지 않음)
+        // 위치/크기만 조정 (z-order 유지되지 않음)
         Native.SetWindowPos(_overlayHwnd, IntPtr.Zero,
             rc.Left, rc.Top, width, height,
             SetWindowPosFlags.SWP_NOACTIVATE | SetWindowPosFlags.SWP_SHOWWINDOW | SetWindowPosFlags.SWP_NOZORDER);
@@ -187,12 +186,12 @@ public sealed class WindowHighlighter : IDisposable
         bool targetTopMost = IsTargetTopMost();
         bool overlayTopMost = ((long)Native.GetWindowLongPtr(_overlayHwnd, -20 /*GWL_EXSTYLE*/ ) & 0x8) != 0; // WS_EX_TOPMOST
 
-        // 현재 overlay 바로 아래 창이 대상인지 확인 (overlay 가 대상 바로 위에 있어야 정상)
+        // 현재 overlay 바로 아래 창이 타겟인지 확인 (overlay 가 항상 바로 위에 있어야 함)
         IntPtr below = Native.GetWindow(_overlayHwnd, 2 /*GW_HWNDNEXT*/);
         bool alreadyCorrect = below == _targetHwnd && targetTopMost == overlayTopMost;
-        if (alreadyCorrect) return; // 재배치 불필요
+        if (alreadyCorrect) return; // 조정 불필요
 
-        // TopMost 스타일 동기화 (필요할 때만)
+        // TopMost 상태를 동기화 (필요한 경우)
         if (targetTopMost != overlayTopMost)
         {
             IntPtr styleAfter = targetTopMost ? (IntPtr)(-1) /*HWND_TOPMOST*/ : (IntPtr)(-2) /*HWND_NOTOPMOST*/;
@@ -201,8 +200,8 @@ public sealed class WindowHighlighter : IDisposable
             overlayTopMost = targetTopMost; // 갱신
         }
 
-        // 대상 창 바로 위로만 이동: hWndInsertAfter = 대상 HWND
-        // (SetWindowPos 규칙: 새 창은 hWndInsertAfter 뒤(=위)에 위치)
+        // 타겟 창 바로 위로 이동: hWndInsertAfter = 타겟 HWND
+        // (SetWindowPos 규칙: 이 창을 hWndInsertAfter 위(=앞)에 위치)
         Native.SetWindowPos(_overlayHwnd, _targetHwnd, 0, 0, 0, 0,
             SetWindowPosFlags.SWP_NOACTIVATE | SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOSIZE);
 
@@ -247,7 +246,7 @@ public sealed class WindowHighlighter : IDisposable
         Native.ShowWindow(_overlayHwnd, show ? 8 /*SW_SHOWNA*/ : 0 /*SW_HIDE*/);
     }
 
-    // 인스턴스 WndProc -> 기본 처리 위임 전 커스텀
+    // 인스턴스 WndProc -> 기본 처리 외에 및 커스텀
     private IntPtr InstanceWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
         switch (msg)
@@ -255,7 +254,7 @@ public sealed class WindowHighlighter : IDisposable
             case 0x000F: // WM_PAINT
                 Paint(hWnd);
                 break;
-            case 0x0084: // WM_NCHITTEST -> 입력 투명
+            case 0x0084: // WM_NCHITTEST -> 입력 차단
                 return (IntPtr)(-1); // HTTRANSPARENT
         }
         return Native.DefWindowProc(hWnd, msg, wParam, lParam);
@@ -319,7 +318,7 @@ public sealed class WindowHighlighter : IDisposable
         if (_overlayHwnd != IntPtr.Zero) Native.DestroyWindow(_overlayHwnd);
         _winEventHook = IntPtr.Zero;
         _overlayHwnd = IntPtr.Zero;
-        _currentRegion = IntPtr.Zero; // SetWindowRgn 소유권 이전
+        _currentRegion = IntPtr.Zero; // SetWindowRgn 처리후 삭제
     }
 
     #region Native Interop
@@ -445,7 +444,7 @@ public sealed class WindowHighlighter : IDisposable
 }
 
 /*
-사용 예 (WinUI 3 등):
+사용 예 (WinUI 3 앱):
 private WindowHighlighter? _highlighter;
 void StartHighlight(IntPtr hwnd)
 {

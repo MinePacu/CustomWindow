@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "dpi_aware.h"
 
 #include "monitors.h"

@@ -5,12 +5,14 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>CustomWindow</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
 	<WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Temporarily disable self-contained to avoid MSBuild task loading issues -->
+    <!-- <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained> -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -19,7 +21,6 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -64,17 +65,19 @@
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
 
-  <!-- Ensure native C++ project builds before this project so latest DLL (with BS_UpdateWindows) exists. -->
+  <!-- Temporarily disabled C++ project reference until BorderServiceCpp project is fixed -->
+  <!--
   <ItemGroup>
     <ProjectReference Include="..\..\..\BorderServiceCpp\BorderServiceCpp.vcxproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
+  -->
 
   <!-- Copy native DLL after build if it exists (robust, no error if missing) -->
+  <!--
   <Target Name="CopyBorderServiceNative" AfterTargets="Build">
     <PropertyGroup>
-      <!-- path from this csproj directory up to solution root -->
       <BorderServiceNativePath>$(MSBuildProjectDirectory)\..\..\..\x64\$(Configuration)\BorderServiceCpp.dll</BorderServiceNativePath>
     </PropertyGroup>
     <ItemGroup Condition="Exists('$(BorderServiceNativePath)')">
@@ -84,4 +87,5 @@
     <Message Importance="High" Text="[CopyBorderServiceNative] Copied BorderServiceCpp.dll to $(OutDir)" Condition="@( _NativeDll ) != ''" />
     <Message Importance="High" Text="[CopyBorderServiceNative] MISSING BorderServiceCpp.dll at $(BorderServiceNativePath)" Condition="!Exists('$(BorderServiceNativePath)')" />
   </Target>
+  -->
 </Project>

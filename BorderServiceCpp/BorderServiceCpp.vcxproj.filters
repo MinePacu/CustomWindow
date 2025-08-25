@@ -39,6 +39,18 @@
     <ClInclude Include="ScalingUtils.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="BorderServiceCppExports.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="monitors.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Settings.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowCornersUtil.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -59,13 +71,19 @@
     <ClCompile Include="VirtualDesktopUtils.h">
       <Filter>헤더 파일</Filter>
     </ClCompile>
-    <ClCompile Include="VirualDesktopUtil.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="dpi_aware.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="ScalingUtils.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="BorderServiceCppExports.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="VirtualDesktopUtils.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="monitors.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
