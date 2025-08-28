@@ -16,6 +16,8 @@ using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using CustomWindow.Utility;
+using System.Reflection;
+using IOPath = System.IO.Path; // 별칭으로 모호성 해결
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -37,6 +39,36 @@ namespace CustomWindow
         public App()
         {
             InitializeComponent();
+            
+            // DLL 로딩 준비
+            SetupNativeDllLoading();
+        }
+
+        private void SetupNativeDllLoading()
+        {
+            try
+            {
+                // 현재 디렉토리를 실행 파일 위치로 설정
+                var exeDir = IOPath.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (!string.IsNullOrEmpty(exeDir))
+                {
+                    Directory.SetCurrentDirectory(exeDir);
+                }
+
+                // DLL 로드 시도
+                var dllLoaded = NativeDllLoader.LoadBorderServiceDll();
+                
+                // 로그를 위한 메시지
+                var message = dllLoaded 
+                    ? "Native DLL loading setup completed successfully"
+                    : "Native DLL loading setup completed (DLL not found - will use fallback)";
+                    
+                System.Diagnostics.Debug.WriteLine($"[App] {message}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[App] DLL loading setup failed: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -48,10 +80,42 @@ namespace CustomWindow
             ConfigStore = await ConfigStore.CreateAsync();
             _window = new MainWindow();
             _window.Activate();
+            
+            // 애플리케이션 종료 시 리소스 정리
             AppDomain.CurrentDomain.ProcessExit += async (_, _) =>
             {
-                if (ConfigStore != null)
-                    await ConfigStore.FlushAsync();
+                try
+                {
+                    // BorderService 안전하게 중지
+                    BorderService.StopIfRunning();
+                    WindowTracker.Stop();
+                    
+                    // Native DLL 언로드
+                    NativeDllLoader.UnloadBorderServiceDll();
+                    
+                    if (ConfigStore != null)
+                        await ConfigStore.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    // 종료 시 에러는 로그만 남기고 무시
+                    System.Diagnostics.Debug.WriteLine($"Shutdown cleanup error: {ex.Message}");
+                }
+            };
+            
+            // 윈도우 종료 시에도 정리
+            _window.Closed += (_, _) =>
+            {
+                try
+                {
+                    BorderService.StopIfRunning();
+                    WindowTracker.Stop();
+                    NativeDllLoader.UnloadBorderServiceDll();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Window close cleanup error: {ex.Message}");
+                }
             };
         }
     }

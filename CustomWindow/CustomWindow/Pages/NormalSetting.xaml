@@ -35,6 +35,28 @@
                         IsOn="{x:Bind ViewModel.AutoWindowChange, Mode=TwoWay}"/>
                 </controls:SettingsCard>
 
+                <!-- BorderService 상태 표시 -->
+                <controls:SettingsCard
+                    Header="테두리 서비스 상태"
+                    Description="{x:Bind ViewModel.BorderServiceStatusText, Mode=OneWay}"
+                    Margin="0, 0, 0, 3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon 
+                            FontFamily="Segoe Fluent Icons" 
+                            Glyph="&#xE9D5;"
+                            Foreground="{x:Bind ViewModel.BorderServiceAvailable, Mode=OneWay, Converter={StaticResource BoolToSuccessColorConverter}}"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button 
+                            Content="다시 그리기" 
+                            Click="ForceRedrawBorders_Click"
+                            IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
+                        <Button 
+                            Content="상태 확인" 
+                            Click="CheckBorderServiceStatus_Click"/>
+                    </StackPanel>
+                </controls:SettingsCard>
+
                 <controls:SettingsExpander
                     Header="제외 프로그램"
                     Description="제외할 프로그램 목록"
