@@ -1,9 +1,7 @@
 ﻿#include "pch.h"
-#include <shellapi.h>
-#include <string>
-#include <string_view>
 
 using namespace winrt;
+
 using Microsoft::WRL::ComPtr;
 
 // Config
@@ -12,6 +10,7 @@ static float g_thickness = 3.0f;
 
 static HWND g_overlay = nullptr;
 static HWINEVENTHOOK g_hook1 = nullptr, g_hook2 = nullptr, g_hook3 = nullptr;
+static HWINEVENTHOOK g_hook4 = nullptr, g_hook5 = nullptr, g_hook6 = nullptr; // new hooks
 
 // Hash for HWND keys
 struct HwndHash {
@@ -269,25 +268,42 @@ static HWND CreateOverlayWindow()
 
     ShowWindow(h, SW_SHOW);
 
-    // periodic safety sync (1s)
-    SetTimer(h, 1, 1000, nullptr);
+    // periodic safety sync (faster: 150ms)
+    SetTimer(h, 1, 150, nullptr);
 
     return h;
 }
 
-void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD, HWND hwnd, LONG idObject, LONG, DWORD, DWORD)
+void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD eventId, HWND hwnd, LONG idObject, LONG, DWORD, DWORD)
 {
-    if (idObject != OBJID_WINDOW || hwnd == nullptr) return;
-    // marshal to UI thread (overlay wnd)
-    if (g_overlay) PostMessageW(g_overlay, WM_APP_REFRESH, 0, 0);
+    // For object events, ensure it's a window; for system events, accept idObject==0
+    if (eventId >= EVENT_OBJECT_CREATE && eventId <= EVENT_OBJECT_HIDE) {
+        if (idObject != OBJID_WINDOW || hwnd == nullptr) return;
+    }
+    // marshal to UI thread (overlay wnd) with minimal latency
+    if (g_overlay) {
+        LRESULT res{};
+        if (!SendMessageTimeoutW(g_overlay, WM_APP_REFRESH, 0, 0, SMTO_NORMAL, 50, reinterpret_cast<PDWORD_PTR>(&res))) {
+            PostMessageW(g_overlay, WM_APP_REFRESH, 0, 0);
+        }
+    }
 }
 
 static void InstallWinEventHooks()
 {
     DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
+    // Show/Hide
     g_hook1 = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE, nullptr, WinEventProc, 0, 0, flags);
+    // Location/Move/Size
     g_hook2 = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, nullptr, WinEventProc, 0, 0, flags);
+    // Minimize state
     g_hook3 = SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, nullptr, WinEventProc, 0, 0, flags);
+    // Destroy (close)
+    g_hook4 = SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_DESTROY, nullptr, WinEventProc, 0, 0, flags);
+    // Foreground change (z-order focus changes)
+    g_hook5 = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, WinEventProc, 0, 0, flags);
+    // Reorder (z-order changes)
+    g_hook6 = SetWinEventHook(EVENT_OBJECT_REORDER, EVENT_OBJECT_REORDER, nullptr, WinEventProc, 0, 0, flags);
 }
 
 static void UninstallWinEventHooks()
@@ -295,6 +311,9 @@ static void UninstallWinEventHooks()
     if (g_hook1) { UnhookWinEvent(g_hook1); g_hook1 = nullptr; }
     if (g_hook2) { UnhookWinEvent(g_hook2); g_hook2 = nullptr; }
     if (g_hook3) { UnhookWinEvent(g_hook3); g_hook3 = nullptr; }
+    if (g_hook4) { UnhookWinEvent(g_hook4); g_hook4 = nullptr; }
+    if (g_hook5) { UnhookWinEvent(g_hook5); g_hook5 = nullptr; }
+    if (g_hook6) { UnhookWinEvent(g_hook6); g_hook6 = nullptr; }
 }
 
 static void DrawBorders(ID2D1DeviceContext* ctx, const std::vector<RECT>& rects)
@@ -368,6 +387,8 @@ static void UpdateOverlayRegion(const std::vector<RECT>& zorderedRects)
 
     // 윈도우 영역 적용(시스템이 finalRgn의 소유권을 가짐)
     SetWindowRgn(g_overlay, finalRgn, FALSE);
+    // Flush DWM to reduce perceived latency of region changes
+    DwmFlush();
     DeleteObject(coveredRgn);
 }
 
@@ -441,98 +462,36 @@ static void SyncTargets()
     }
 }
 
-static bool TryParseColorHex(std::wstring_view s, D2D1_COLOR_F& out)
-{
-    if (!s.empty() && s.front() == L'#') s.remove_prefix(1);
-    if (s.size() != 6 && s.size() != 8) return false;
-
-    unsigned int v = 0;
-    for (wchar_t ch : s) {
-        unsigned int d = 0;
-        if (ch >= L'0' && ch <= L'9') d = ch - L'0';
-        else if (ch >= L'a' && ch <= L'f') d = 10u + (ch - L'a');
-        else if (ch >= L'A' && ch <= L'F') d = 10u + (ch - L'A');
-        else return false;
-        v = (v << 4) | d;
-    }
-
-    unsigned int a = 0xFF, r, g, b;
-    if (s.size() == 8) { a = (v >> 24) & 0xFF; r = (v >> 16) & 0xFF; g = (v >> 8) & 0xFF; b = v & 0xFF; }
-    else { r = (v >> 16) & 0xFF; g = (v >> 8) & 0xFF; b = v & 0xFF; }
-
-    out = D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
-    return true;
-}
-
-struct CmdArgs {
-    bool console = false;
-    bool hasColor = false; D2D1_COLOR_F color{};
-    bool hasThickness = false; float thickness = 0.0f;
-};
-
-static CmdArgs ParseCmd()
-{
-    CmdArgs out{};
-    int argc = 0;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (!argv) return out;
-
-    for (int i = 1; i < argc; ++i) {
-        std::wstring_view a = argv[i];
-        if (a == L"--console") out.console = true;
-        else if (a == L"--color" && i + 1 < argc) {
-            std::wstring_view v = argv[++i];
-            D2D1_COLOR_F c{};
-            if (TryParseColorHex(v, c)) { out.hasColor = true; out.color = c; }
-        }
-        else if ((a == L"--thickness" || a == L"-t") && i + 1 < argc) {
-            std::wstring_view v = argv[++i];
-            wchar_t* endp = nullptr;
-            float t = wcstof(std::wstring(v).c_str(), &endp);
-            if (endp && t > 0.0f) { out.hasThickness = true; out.thickness = t; }
-        }
-    }
-    LocalFree(argv);
-    return out;
-}
-
-static void ApplyArgs(const CmdArgs& args)
-{
-    if (args.hasColor) g_borderColor = args.color;
-    if (args.hasThickness) g_thickness = args.thickness;
-}
-
 int main()
 {
-    auto args = ParseCmd();
-    if (args.console) {
-        AllocConsole();
-        FILE* f;
-        freopen_s(&f, "CONOUT$", "w", stdout);
-        freopen_s(&f, "CONOUT$", "w", stderr);
-        wprintf(L"[BorderServiceWinRT] console attached\n");
-    }
-    ApplyArgs(args);
-
+    // DPI awareness for accurate coordinates
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     winrt::init_apartment();
 
+    // Create overlay first
     g_overlay = CreateOverlayWindow();
+
+    // Create devices
     if (FAILED(CreateD3DDevice())) return -1;
     if (FAILED(CreateD2D())) return -2;
     if (FAILED(CreateDComp(g_overlay))) return -3;
 
+    // Initial sync + draw
     SyncTargets();
     RefreshOverlay();
+
+    // Hooks
     InstallWinEventHooks();
 
-    if (args.console) {
-        wprintf(L"[BorderServiceWinRT] thickness=%.2f color=%.3f,%.3f,%.3f,%.3f\n",
-            g_thickness, g_borderColor.r, g_borderColor.g, g_borderColor.b, g_borderColor.a);
+    // Message loop
+    MSG msg{};
+    while (GetMessageW(&msg, nullptr, 0, 0))
+    {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
     }
 
-    MSG msg{};
-    while (GetMessageW(&msg, nullptr, 0, 0)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
     UninstallWinEventHooks();
     return 0;
 }

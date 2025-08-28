@@ -46,7 +46,41 @@ public static class BorderService
 
     /// <summary>현재 모드 태그</summary>
     private static string CurrentModeTag
-        => (_winrtProc != null && !_winrtProc.HasExited) ? "EXE" : (_host != null ? "DLL" : "IDLE");
+        => (IsExeModeRunning) ? "EXE" : (_host != null ? "DLL" : "IDLE");
+
+    /// <summary>EXE 모드 실행 여부</summary>
+    public static bool IsExeModeRunning => _winrtProc != null && !_winrtProc.HasExited;
+
+    /// <summary>현재 실행 중인 EXE PID</summary>
+    public static int? CurrentExePid => IsExeModeRunning ? _winrtProc!.Id : null;
+
+    /// <summary>실행 중인 EXE의 전체 경로(가능한 경우)</summary>
+    public static string? GetRunningExePath()
+    {
+        try { return _winrtProc?.MainModule?.FileName; } catch { return null; }
+    }
+
+    /// <summary>EXE 파일 존재 여부와 경로(실행 중이면 해당 경로, 아니면 검색)</summary>
+    public static (bool Found, string? Path) GetExePathInfo()
+    {
+        var runningPath = GetRunningExePath();
+        if (!string.IsNullOrEmpty(runningPath)) return (true, runningPath);
+        var path = FindWinRTExePath();
+        return (!string.IsNullOrEmpty(path), path);
+    }
+
+    /// <summary>요약 상태 문자열 (EXE 전용)</summary>
+    public static string GetExeStatusSummary()
+    {
+        if (IsExeModeRunning)
+        {
+            var pid = CurrentExePid;
+            var path = GetRunningExePath();
+            return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 미확인" : path)})";
+        }
+        var info = GetExePathInfo();
+        return info.Found ? $"EXE 파일 발견: {info.Path}" : "EXE 파일을 찾을 수 없음";
+    }
 
     /// <summary>BorderService 시작</summary>
     public static void StartIfNeeded(string borderColorHex, int thickness, string[] excludedProcesses)
@@ -56,7 +90,8 @@ public static class BorderService
             if (PreferExeMode)
             {
                 LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness})");
-                StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: true);
+                // 콘솔 창 없이 파이프로 출력 캡처하여 UI에 표시
+                StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: false);
                 return;
             }
 
@@ -139,11 +174,11 @@ public static class BorderService
         lock (_sync)
         {
             // EXE 모드: 재시작으로 반영
-            if (_winrtProc != null && !_winrtProc.HasExited)
+            if (IsExeModeRunning)
             {
                 _lastColor = string.IsNullOrWhiteSpace(borderColorHex) ? _lastColor : borderColorHex.Trim();
                 LogMessage($"Restarting EXE for color change -> {_lastColor}");
-                RestartWinRTConsoleForSettingsUpdate(borderColorHex, GetCurrentThicknessOrDefault(), exePath: null, showConsole: true);
+                RestartWinRTConsoleForSettingsUpdate(borderColorHex, GetCurrentThicknessOrDefault(), exePath: null, showConsole: false);
                 return;
             }
 
@@ -167,11 +202,11 @@ public static class BorderService
         lock (_sync)
         {
             // EXE 모드: 재시작으로 반영
-            if (_winrtProc != null && !_winrtProc.HasExited)
+            if (IsExeModeRunning)
             {
                 _lastThickness = thickness;
                 LogMessage($"Restarting EXE for thickness change -> {thickness}");
-                RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), thickness, exePath: null, showConsole: true);
+                RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), thickness, exePath: null, showConsole: false);
                 return;
             }
 
@@ -189,7 +224,7 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (_winrtProc != null && !_winrtProc.HasExited)
+            if (IsExeModeRunning)
             {
                 LogMessage("Force redraw is not supported in EXE mode (no IPC). Use restart via UpdateColor/UpdateThickness.");
                 return;
@@ -219,7 +254,7 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (_winrtProc != null && !_winrtProc.HasExited)
+            if (IsExeModeRunning)
             {
                 LogMessage("SetPartialRatio is not supported in EXE mode.");
                 return;
@@ -245,7 +280,7 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (_winrtProc != null && !_winrtProc.HasExited)
+            if (IsExeModeRunning)
             {
                 LogMessage("EnableMerge is not supported in EXE mode.");
                 return;
@@ -273,7 +308,7 @@ public static class BorderService
         {
             lock (_sync)
             {
-                var exeRunning = _winrtProc != null && !_winrtProc.HasExited;
+                var exeRunning = IsExeModeRunning;
                 var dllRunning = _running && _host != null;
                 return exeRunning || dllRunning;
             }
@@ -428,6 +463,14 @@ public static class BorderService
         WindowTracker.AddExternalLog(logLine);
     }
 
+    private static void LogExeOutput(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return;
+        var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|EXE] {message}";
+        LogReceived?.Invoke(logLine);
+        WindowTracker.AddExternalLog(logLine);
+    }
+
     private static int ParseColor(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) return unchecked((int)0xFF000000);
@@ -452,7 +495,7 @@ public static class BorderService
     private static string BuildArgs(string borderColorHex, int thickness, bool withConsole)
     {
         var color = string.IsNullOrWhiteSpace(borderColorHex) ? "#0078FF" : borderColorHex.Trim();
-        return $"{(withConsole ? "--console " : "")}--color \"{color}\" --thickness {thickness}";
+        return $"{(withConsole ? "--console " : string.Empty)}--color \"{color}\" --thickness {thickness}";
     }
 
     private static string? FindWinRTExePath()
@@ -498,17 +541,33 @@ public static class BorderService
                 if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
                     throw new FileNotFoundException("BorderServiceWinRT executable not found.", path);
 
+                // showConsole=false 이면 표준 출력/오류를 리다이렉트하여 UI 로그로 전달
                 var args = BuildArgs(borderColorHex, thickness, withConsole: showConsole);
                 var psi = new ProcessStartInfo(path, args)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = !showConsole,
-                    WorkingDirectory = Path.GetDirectoryName(path) ?? AppDomain.CurrentDomain.BaseDirectory
+                    WorkingDirectory = Path.GetDirectoryName(path) ?? AppDomain.CurrentDomain.BaseDirectory,
+                    RedirectStandardOutput = !showConsole,
+                    RedirectStandardError = !showConsole
                 };
 
                 _winrtProc = Process.Start(psi);
                 if (_winrtProc == null)
                     throw new InvalidOperationException("Failed to start BorderServiceWinRT process.");
+
+                // 출력 캡처: 콘솔 창을 띄우지 않는 경우에만
+                if (!showConsole)
+                {
+                    _winrtProc.OutputDataReceived += (_, e) => { if (e.Data != null) LogExeOutput(e.Data); };
+                    _winrtProc.ErrorDataReceived += (_, e) => { if (e.Data != null) LogExeOutput(e.Data); };
+                    try
+                    {
+                        _winrtProc.BeginOutputReadLine();
+                        _winrtProc.BeginErrorReadLine();
+                    }
+                    catch { /* ignore */ }
+                }
 
                 _winrtProc.EnableRaisingEvents = true;
                 _winrtProc.Exited += (_, __) =>
