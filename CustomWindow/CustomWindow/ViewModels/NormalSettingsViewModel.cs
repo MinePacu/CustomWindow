@@ -42,6 +42,20 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
+    // New: toggle to show the BorderService console
+    public bool ShowBorderServiceConsole
+    {
+        get => _config.ShowBorderServiceConsole;
+        set
+        {
+            if (_config.ShowBorderServiceConsole == value) return;
+            _config.ShowBorderServiceConsole = value;
+            OnPropertyChanged();
+            // Apply preference to running EXE (restart to switch console visibility)
+            BorderService.SetConsoleVisibilityPreference(value);
+        }
+    }
+
     // 카드 설명: EXE 모드 상태 + DLL 가용성
     public string BorderServiceStatusText
     {
@@ -81,6 +95,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 // BorderService 시작
                 var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 색상
                 int thickness = _config.BorderThickness;
+                BorderService.SetConsoleVisibilityPreference(_config.ShowBorderServiceConsole);
                 BorderService.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 
                 // (DLL 모드일 때만) 추가 설정

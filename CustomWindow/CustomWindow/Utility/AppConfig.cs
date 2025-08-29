@@ -32,6 +32,9 @@ public sealed class AppConfig
     public bool RunOnBoot { get; set; }
     public bool UseCustomTitleBar { get; set; }
 
+    // Show EXE console window for BorderService
+    public bool ShowBorderServiceConsole { get; set; } // default false
+
     // Window settings
     public bool EnableTaskbarBorder { get; set; }
     public string? TaskbarCornerMode { get; set; }

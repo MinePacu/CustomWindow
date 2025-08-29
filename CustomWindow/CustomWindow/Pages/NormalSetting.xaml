@@ -57,6 +57,18 @@
                     </StackPanel>
                 </controls:SettingsCard>
 
+                <!-- New: BorderService 콘솔 표시 설정 -->
+                <controls:SettingsCard
+                    Header="BorderService 콘솔 표시"
+                    Description="CustomWindow에서 실행할 때 콘솔 창을 표시합니다. (재시작 필요)"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F4;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.ShowBorderServiceConsole, Mode=TwoWay}"/>
+                </controls:SettingsCard>
+
                 <controls:SettingsExpander
                     Header="제외 프로그램"
                     Description="제외할 프로그램 목록"

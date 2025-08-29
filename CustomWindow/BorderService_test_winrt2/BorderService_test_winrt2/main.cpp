@@ -1,8 +1,38 @@
 ﻿#include "pch.h"
+#include <cwctype>
+#include <algorithm>
+#include <string>
+#include <shellapi.h>
+#include <cstdio>
 
 using namespace winrt;
 
 using Microsoft::WRL::ComPtr;
+
+// Simple logging helpers
+static void DebugLog(const std::wstring& s)
+{
+    OutputDebugStringW((s + L"\n").c_str());
+    if (GetConsoleWindow()) {
+        _putws(s.c_str());
+    }
+}
+
+// Console control via args
+static bool g_console = false;
+static void EnsureConsole()
+{
+    if (!g_console) return;
+    if (GetConsoleWindow()) return;
+    if (AllocConsole())
+    {
+        FILE* fp;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        freopen_s(&fp, "CONIN$",  "r", stdin);
+        DebugLog(L"[Overlay] Console allocated");
+    }
+}
 
 // Config
 static D2D1_COLOR_F g_borderColor = D2D1::ColorF(0.0f, 0.8f, 1.0f, 1.0f);
@@ -220,6 +250,69 @@ static void UpdateVirtualScreenAndResize()
     g_surface.Reset();
 }
 
+// Helpers: parse hex color
+static bool ParseColorHex(const std::wstring& hex, D2D1_COLOR_F& out)
+{
+    if (hex.empty()) return false;
+    std::wstring h = hex;
+    if (h[0] == L'#') h.erase(h.begin());
+    if (h.size() != 6 && h.size() != 8) return false;
+    unsigned int val = 0;
+    try {
+        val = std::stoul(h, nullptr, 16);
+    } catch (...) { return false; }
+
+    float a = 1.0f, r = 0, g = 0, b = 0;
+    if (h.size() == 8) {
+        unsigned int A = (val >> 24) & 0xFF;
+        unsigned int R = (val >> 16) & 0xFF;
+        unsigned int G = (val >> 8) & 0xFF;
+        unsigned int B = (val) & 0xFF;
+        a = A / 255.0f; r = R / 255.0f; g = G / 255.0f; b = B / 255.0f;
+    } else {
+        unsigned int R = (val >> 16) & 0xFF;
+        unsigned int G = (val >> 8) & 0xFF;
+        unsigned int B = (val) & 0xFF;
+        a = 1.0f; r = R / 255.0f; g = G / 255.0f; b = B / 255.0f;
+    }
+    out = D2D1::ColorF(r, g, b, a);
+    return true;
+}
+
+static void ApplySettingsFromCommand(const std::wstring& cmd)
+{
+    std::wstring lower = cmd;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](wchar_t c){ return (wchar_t)::towlower(c); });
+
+    // find color
+    size_t cpos = lower.find(L"color=");
+    if (cpos != std::wstring::npos) {
+        size_t start = cpos + 6;
+        size_t end = lower.find_first_of(L" ;\r\n\t", start);
+        std::wstring col = cmd.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+        D2D1_COLOR_F cf{};
+        if (ParseColorHex(col, cf)) {
+            g_borderColor = cf;
+            DebugLog(L"[Overlay] Applied color: " + std::wstring(col));
+        }
+    }
+
+    // find thickness
+    size_t tpos = lower.find(L"thickness=");
+    if (tpos != std::wstring::npos) {
+        size_t start = tpos + 10;
+        size_t end = lower.find_first_of(L" ;\r\n\t", start);
+        std::wstring th = lower.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+        try {
+            float tv = std::stof(th);
+            if (tv > 0 && tv < 1000) {
+                g_thickness = tv;
+                DebugLog(L"[Overlay] Applied thickness: " + th);
+            }
+        } catch (...) {}
+    }
+}
+
 static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -234,6 +327,22 @@ static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         SyncTargets();
         RefreshOverlay();
         return 0;
+    case WM_COPYDATA:
+        {
+            PCOPYDATASTRUCT cds = reinterpret_cast<PCOPYDATASTRUCT>(lParam);
+            if (cds && cds->lpData && cds->cbData > 0) {
+                const wchar_t* data = static_cast<const wchar_t*>(cds->lpData);
+                size_t wlen = cds->cbData / sizeof(wchar_t);
+                while (wlen > 0 && data[wlen - 1] == L'\0') --wlen;
+                std::wstring msgStr(data, data + wlen);
+                DebugLog(L"[Overlay] WM_COPYDATA received: " + msgStr);
+                ApplySettingsFromCommand(msgStr);
+                PostMessageW(hwnd, WM_APP_REFRESH, 0, 0);
+            } else {
+                DebugLog(L"[Overlay] WM_COPYDATA received with empty data");
+            }
+            return 0;
+        }
     case WM_NCHITTEST:
         return static_cast<LRESULT>(HTTRANSPARENT);
     case WM_MOUSEACTIVATE:
@@ -266,21 +375,25 @@ static HWND CreateOverlayWindow()
         g_virtualScreen.bottom - g_virtualScreen.top,
         nullptr, nullptr, wc.hInstance, nullptr);
 
+    // allow WM_COPYDATA from lower integrity senders
+    CHANGEFILTERSTRUCT cfs{ sizeof(CHANGEFILTERSTRUCT) };
+    ChangeWindowMessageFilterEx(h, WM_COPYDATA, MSGFLT_ALLOW, &cfs);
+
     ShowWindow(h, SW_SHOW);
 
     // periodic safety sync (faster: 150ms)
     SetTimer(h, 1, 150, nullptr);
+
+    DebugLog(L"[Overlay] Overlay window created and message filter applied");
 
     return h;
 }
 
 void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD eventId, HWND hwnd, LONG idObject, LONG, DWORD, DWORD)
 {
-    // For object events, ensure it's a window; for system events, accept idObject==0
     if (eventId >= EVENT_OBJECT_CREATE && eventId <= EVENT_OBJECT_HIDE) {
         if (idObject != OBJID_WINDOW || hwnd == nullptr) return;
     }
-    // marshal to UI thread (overlay wnd) with minimal latency
     if (g_overlay) {
         LRESULT res{};
         if (!SendMessageTimeoutW(g_overlay, WM_APP_REFRESH, 0, 0, SMTO_NORMAL, 50, reinterpret_cast<PDWORD_PTR>(&res))) {
@@ -292,17 +405,11 @@ void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD eventId, HWND hwnd, LONG idObjec
 static void InstallWinEventHooks()
 {
     DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
-    // Show/Hide
     g_hook1 = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE, nullptr, WinEventProc, 0, 0, flags);
-    // Location/Move/Size
     g_hook2 = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, nullptr, WinEventProc, 0, 0, flags);
-    // Minimize state
     g_hook3 = SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, nullptr, WinEventProc, 0, 0, flags);
-    // Destroy (close)
     g_hook4 = SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_DESTROY, nullptr, WinEventProc, 0, 0, flags);
-    // Foreground change (z-order focus changes)
     g_hook5 = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, WinEventProc, 0, 0, flags);
-    // Reorder (z-order changes)
     g_hook6 = SetWinEventHook(EVENT_OBJECT_REORDER, EVENT_OBJECT_REORDER, nullptr, WinEventProc, 0, 0, flags);
 }
 
@@ -329,28 +436,21 @@ static void DrawBorders(ID2D1DeviceContext* ctx, const std::vector<RECT>& rects)
     }
 }
 
-// Z-Order를 보존한 사각형 목록을 받아, 위 창들로 가려진 부분을 제외한 '바깥쪽 띠'만
-// 오버레이 윈도우 영역으로 설정
 static void UpdateOverlayRegion(const std::vector<RECT>& zorderedRects)
 {
     if (!g_overlay) return;
 
-    // 최종 오버레이 영역(윈도우가 보이는 부분)
     HRGN finalRgn = CreateRectRgn(0, 0, 0, 0);
-    // 위에 위치한 창들의 합집합(가려지는 영역)
     HRGN coveredRgn = CreateRectRgn(0, 0, 0, 0);
 
     int t = (int)(g_thickness + 0.999f); // ceil
     if (t < 1) t = 1;
         
-    // 상단(TopMost) -> 하단 순서로 열거된 rects 입력을 전제로 함
     for (const auto& r : zorderedRects)
     {
-        // 오버레이 좌표계로 변환
         RECT winR{ r.left - g_virtualScreen.left, r.top - g_virtualScreen.top,
                    r.right - g_virtualScreen.left, r.bottom - g_virtualScreen.top };
 
-        // 테두리 '바깥쪽 띠' 영역 생성
         RECT topBand    { winR.left - t, winR.top - t, winR.right + t, winR.top };
         RECT bottomBand { winR.left - t, winR.bottom,  winR.right + t, winR.bottom + t };
         RECT leftBand   { winR.left - t, winR.top - t, winR.left,      winR.bottom + t };
@@ -367,32 +467,25 @@ static void UpdateOverlayRegion(const std::vector<RECT>& zorderedRects)
         addBand(leftBand);
         addBand(rightBand);
 
-        // 이미 위 창들이 덮고 있는 영역(coveredRgn)을 빼서 실제로 보이는 부분만 남김
         HRGN visibleBands = CreateRectRgn(0, 0, 0, 0);
         CombineRgn(visibleBands, bandRgn, coveredRgn, RGN_DIFF);
 
-        // 최종 오버레이 영역에 합치기
         CombineRgn(finalRgn, finalRgn, visibleBands, RGN_OR);
 
-        // 다음 창들을 위해 '덮는 영역'에 현재 창 사각형(띠 두께만큼 확장)을 추가
         RECT occ{ winR.left - t, winR.top - t, winR.right + t, winR.bottom + t };
         HRGN occRgn = CreateRectRgn(occ.left, occ.top, occ.right, occ.bottom);
         CombineRgn(coveredRgn, coveredRgn, occRgn, RGN_OR);
 
-        // 정리
         DeleteObject(occRgn);
         DeleteObject(visibleBands);
         DeleteObject(bandRgn);
     }
 
-    // 윈도우 영역 적용(시스템이 finalRgn의 소유권을 가짐)
     SetWindowRgn(g_overlay, finalRgn, FALSE);
-    // Flush DWM to reduce perceived latency of region changes
     DwmFlush();
     DeleteObject(coveredRgn);
 }
 
-// RefreshOverlay 교체: Z-Order 유지 목록으로 클리핑/렌더링
 void RefreshOverlay()
 {
     if (!g_overlay) return;
@@ -401,10 +494,9 @@ void RefreshOverlay()
     UINT height = g_virtualScreen.bottom - g_virtualScreen.top;
     if (FAILED(EnsureSurface(width, height))) return;
 
-    // 1) Z-Order를 보존한 창 목록 확보
     std::vector<RECT> rectsZ;
     {
-        auto hwnds = CollectUserVisibleWindows(); // EnumWindows 순서: 상단 -> 하단
+        auto hwnds = CollectUserVisibleWindows();
         rectsZ.reserve(hwnds.size());
         for (HWND h : hwnds) {
             RECT rc{};
@@ -412,10 +504,8 @@ void RefreshOverlay()
         }
     }
 
-    // 2) 오버레이 윈도우 영역을 '가시 부분의 바깥 띠'로만 설정(가려진 곳은 제외)
     UpdateOverlayRegion(rectsZ);
 
-    // 3) 렌더링
     POINT offset{ 0,0 };
     ComPtr<ID2D1DeviceContext> ctx;
     BeginDrawOnSurface(width, height, &ctx, &offset);
@@ -424,7 +514,6 @@ void RefreshOverlay()
     ctx->BeginDraw();
     ctx->Clear(D2D1::ColorF(0, 0));
 
-    // 라인은 전체를 그리되, 오버레이 윈도우 영역으로 최종 클립됨
     DrawBorders(ctx.Get(), rectsZ);
 
     if (SUCCEEDED(ctx->EndDraw())) {
@@ -432,13 +521,10 @@ void RefreshOverlay()
     }
 }
 
-// 보이는 창 목록과 g_targets를 동기화: 신규/이동/닫힘 반영
 static void SyncTargets()
 {
-    // 현재 보이는 창들 수집
     auto current = CollectUserVisibleWindows();
 
-    // 빠른 포함 검사용 집합
     std::unordered_set<HWND, HwndHash, HwndEq> curset;
     curset.reserve(current.size());
 
@@ -447,11 +533,10 @@ static void SyncTargets()
         curset.insert(h);
         RECT rc{};
         if (GetWindowBounds(h, rc)) {
-            g_targets[h] = rc; // 추가 또는 업데이트
+            g_targets[h] = rc;
         }
     }
 
-    // 사라진(닫힘/비가시) 창 제거
     for (auto it = g_targets.begin(); it != g_targets.end(); )
     {
         HWND h = it->first;
@@ -462,8 +547,54 @@ static void SyncTargets()
     }
 }
 
+// Parse command-line args and apply initial settings
+static void ParseArgsAndApply()
+{
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv) return;
+
+    auto tolower = [](std::wstring s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](wchar_t c){ return (wchar_t)::towlower(c); });
+        return s;
+    };
+
+    for (int i = 0; i < argc; ++i)
+    {
+        std::wstring arg = tolower(argv[i]);
+        if (arg == L"--console") { g_console = true; continue; }
+
+        if (arg == L"--color" && i + 1 < argc) {
+            D2D1_COLOR_F cf{};
+            if (ParseColorHex(argv[i + 1], cf)) { g_borderColor = cf; DebugLog(L"[Overlay] Arg color: " + std::wstring(argv[i + 1])); }
+            ++i; continue;
+        }
+        if (arg.rfind(L"--color=", 0) == 0) {
+            std::wstring val = std::wstring(argv[i] + 8);
+            D2D1_COLOR_F cf{};
+            if (ParseColorHex(val, cf)) { g_borderColor = cf; DebugLog(L"[Overlay] Arg color: " + val); }
+            continue;
+        }
+        if (arg == L"--thickness" && i + 1 < argc) {
+            try { float tv = std::stof(argv[i + 1]); if (tv > 0 && tv < 1000) { g_thickness = tv; DebugLog(L"[Overlay] Arg thickness: " + std::wstring(argv[i + 1])); } } catch (...) {}
+            ++i; continue;
+        }
+        if (arg.rfind(L"--thickness=", 0) == 0) {
+            std::wstring val = std::wstring(argv[i] + 12);
+            try { float tv = std::stof(val); if (tv > 0 && tv < 1000) { g_thickness = tv; DebugLog(L"[Overlay] Arg thickness: " + val); } } catch (...) {}
+            continue;
+        }
+    }
+
+    LocalFree(argv);
+}
+
 int main()
 {
+    // Parse args and optionally allocate console first
+    ParseArgsAndApply();
+    EnsureConsole();
+
     // DPI awareness for accurate coordinates
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
@@ -483,6 +614,8 @@ int main()
 
     // Hooks
     InstallWinEventHooks();
+
+    DebugLog(L"[Overlay] Started overlay loop");
 
     // Message loop
     MSG msg{};

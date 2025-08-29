@@ -24,6 +24,13 @@ public static class BorderService
     // Keep last used values for EXE restart scenarios
     private static string _lastColor = "#0078FF";
     private static int _lastThickness = 3;
+    private static bool _lastShowConsole = false; // new: remember console preference
+
+    // IPC constants
+    private const uint WM_COPYDATA = 0x004A;
+    private const uint SMTO_NORMAL = 0x0000;
+    private const uint SMTO_ABORTIFHUNG = 0x0002;
+    private const string OverlayWindowClass = "BorderOverlayDCompWindowClass";
 
     // 로그 이벤트
     public static event Action<string>? LogReceived;    
@@ -46,10 +53,19 @@ public static class BorderService
 
     /// <summary>현재 모드 태그</summary>
     private static string CurrentModeTag
-        => (IsExeModeRunning) ? "EXE" : (_host != null ? "DLL" : "IDLE");
+        => (IsExeModeRunning ? "EXE" : (_host != null ? "DLL" : "IDLE"));
 
     /// <summary>EXE 모드 실행 여부</summary>
     public static bool IsExeModeRunning => _winrtProc != null && !_winrtProc.HasExited;
+
+    /// <summary>외부에서 실행된 오버레이 윈도우 존재 여부</summary>
+    private static bool IsOverlayPresent()
+    {
+        try { return FindOverlayWindow() != IntPtr.Zero; } catch { return false; }
+    }
+  
+    /// <summary>오버레이(내부 EXE 또는 외부) 사용 가능 여부</summary>
+    private static bool OverlayAvailable => IsExeModeRunning || IsOverlayPresent();
 
     /// <summary>현재 실행 중인 EXE PID</summary>
     public static int? CurrentExePid => IsExeModeRunning ? _winrtProc!.Id : null;
@@ -76,10 +92,29 @@ public static class BorderService
         {
             var pid = CurrentExePid;
             var path = GetRunningExePath();
-            return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 미확인" : path)})";
+            return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 미확인" : path)}{(_lastShowConsole ? ", Console=Shown" : ", Console=Hidden")})";
+        }
+        if (IsOverlayPresent())
+        {
+            return "외부 실행된 오버레이 감지됨";
         }
         var info = GetExePathInfo();
         return info.Found ? $"EXE 파일 발견: {info.Path}" : "EXE 파일을 찾을 수 없음";
+    }
+
+    /// <summary>사용자 콘솔 표시 선호 설정</summary>
+    public static void SetConsoleVisibilityPreference(bool show)
+    {
+        lock (_sync)
+        {
+            _lastShowConsole = show;
+            LogMessage($"Console visibility preference set: {(_lastShowConsole ? "Show" : "Hide")}");
+            if (IsExeModeRunning)
+            {
+                LogMessage("Restarting EXE to apply console visibility change");
+                RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
+            }
+        }
     }
 
     /// <summary>BorderService 시작</summary>
@@ -89,9 +124,9 @@ public static class BorderService
         {
             if (PreferExeMode)
             {
-                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness})");
-                // 콘솔 창 없이 파이프로 출력 캡처하여 UI에 표시
-                StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: false);
+                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")})");
+                // 콘솔 창 옵션을 사용자 설정에 맞게 시작
+                StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: _lastShowConsole);
                 return;
             }
 
@@ -173,13 +208,22 @@ public static class BorderService
     {
         lock (_sync)
         {
-            // EXE 모드: 재시작으로 반영
-            if (IsExeModeRunning)
+            _lastColor = string.IsNullOrWhiteSpace(borderColorHex) ? _lastColor : borderColorHex.Trim();
+
+            // EXE 또는 외부 오버레이가 있으면 IPC 우선
+            if (OverlayAvailable)
             {
-                _lastColor = string.IsNullOrWhiteSpace(borderColorHex) ? _lastColor : borderColorHex.Trim();
-                LogMessage($"Restarting EXE for color change -> {_lastColor}");
-                RestartWinRTConsoleForSettingsUpdate(borderColorHex, GetCurrentThicknessOrDefault(), exePath: null, showConsole: false);
-                return;
+                if (TrySendSettingsToOverlay(_lastColor, GetCurrentThicknessOrDefault()))
+                {
+                    LogMessage($"Applied color via IPC -> {_lastColor}");
+                    return;
+                }
+                LogMessage($"IPC failed - attempting EXE restart for color change -> {_lastColor}");
+                if (IsExeModeRunning)
+                {
+                    RestartWinRTConsoleForSettingsUpdate(_lastColor, GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
+                    return;
+                }
             }
 
             // DLL 모드가 살아있다면(테스트/백업 용)
@@ -201,13 +245,22 @@ public static class BorderService
     {
         lock (_sync)
         {
-            // EXE 모드: 재시작으로 반영
-            if (IsExeModeRunning)
+            _lastThickness = thickness;
+
+            // EXE 또는 외부 오버레이가 있으면 IPC 우선
+            if (OverlayAvailable)
             {
-                _lastThickness = thickness;
-                LogMessage($"Restarting EXE for thickness change -> {thickness}");
-                RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), thickness, exePath: null, showConsole: false);
-                return;
+                if (TrySendSettingsToOverlay(GetCurrentColorOrDefault(), thickness))
+                {
+                    LogMessage($"Applied thickness via IPC -> {thickness}");
+                    return;
+                }
+                LogMessage($"IPC failed - attempting EXE restart for thickness change -> {thickness}");
+                if (IsExeModeRunning)
+                {
+                    RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), thickness, exePath: null, showConsole: _lastShowConsole);
+                    return;
+                }
             }
 
             // DLL 모드(백업)
@@ -224,9 +277,13 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (IsExeModeRunning)
+            if (OverlayAvailable)
             {
-                LogMessage("Force redraw is not supported in EXE mode (no IPC). Use restart via UpdateColor/UpdateThickness.");
+                // IPC로 새로고침 요청
+                if (!TrySendRefreshToOverlay())
+                {
+                    LogMessage("Force redraw IPC failed.");
+                }
                 return;
             }
 
@@ -254,7 +311,7 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (IsExeModeRunning)
+            if (OverlayAvailable)
             {
                 LogMessage("SetPartialRatio is not supported in EXE mode.");
                 return;
@@ -280,7 +337,7 @@ public static class BorderService
     {
         lock (_sync)
         {
-            if (IsExeModeRunning)
+            if (OverlayAvailable)
             {
                 LogMessage("EnableMerge is not supported in EXE mode.");
                 return;
@@ -308,9 +365,9 @@ public static class BorderService
         {
             lock (_sync)
             {
-                var exeRunning = IsExeModeRunning;
+                var exeOrOverlay = OverlayAvailable;
                 var dllRunning = _running && _host != null;
-                return exeRunning || dllRunning;
+                return exeOrOverlay || dllRunning;
             }
         }
     }
@@ -500,9 +557,8 @@ public static class BorderService
 
     private static string? FindWinRTExePath()
     {
-        // 우선순위: 앱 폴더 옆 => 솔루션 형제 폴더 => Debug/Release 빌드 출력
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        var exeNames = new[] { "BorderServiceWinRT.exe", "BorderService_test_winrt2.exe" };
+        var exeNames = new[] { "BorderService_test_winrt2.exe", "BorderServiceWinRT.exe" }; // 우선 test exe
         var candidates = new List<string>();
 
         foreach (var name in exeNames)
@@ -514,7 +570,20 @@ public static class BorderService
             candidates.Add(Path.GetFullPath(Path.Combine(baseDir, "BorderService_test_winrt2", "x64", "Release", name)));
         }
 
-        return candidates.FirstOrDefault(File.Exists);
+        // 중복 제거 + 존재하는 파일만
+        var existing = candidates
+            .Where(File.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(p => new FileInfo(p))
+            .OrderByDescending(fi => fi.LastWriteTimeUtc)
+            .ToList();
+
+        if (existing.Count == 0) return null;
+
+        var chosen = existing[0].FullName;
+        LogMessage($"WinRT EXE candidates (newest first):{Environment.NewLine}{string.Join(Environment.NewLine, existing.Select(fi => $"- {fi.FullName} (LastWrite={fi.LastWriteTimeUtc:u})"))}");
+        LogMessage($"Chosen WinRT EXE: {chosen}");
+        return chosen;
     }
 
     private static string GetCurrentColorOrDefault() => _lastColor;
@@ -527,6 +596,7 @@ public static class BorderService
         {
             _lastColor = string.IsNullOrWhiteSpace(borderColorHex) ? "#0078FF" : borderColorHex;
             _lastThickness = thickness;
+            _lastShowConsole = showConsole;
 
             if (_running && _winrtProc != null && !_winrtProc.HasExited)
             {
@@ -582,6 +652,26 @@ public static class BorderService
 
                 _running = true;
                 LogMessage($"Started BorderServiceWinRT (EXE): {path} {args}");
+
+                // 시작 후 오버레이 준비되면 현재 설정을 재전송 (백그라운드)
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    var hwnd = WaitForOverlayWindowReady();
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        TrySendCopyData(hwnd, $"SET color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()}");
+                        TrySendCopyData(hwnd, $"REFRESH color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()}");
+                        LogMessage("Overlay ready -> settings re-applied via IPC");
+                    }
+                    else
+                    {
+                        LogMessage("Overlay not ready within timeout after start");
+                    }
+                });
+
+                // StartWinRTConsole try 블록에서 path 결정 직후 추가
+                var fvi = FileVersionInfo.GetVersionInfo(path);
+                LogMessage($"EXE file: {Path.GetFileName(path)}, Desc={fvi.FileDescription}, Ver={fvi.FileVersion}, LastWrite={File.GetLastWriteTimeUtc(path):u}");
             }
             catch (Exception ex)
             {
@@ -624,6 +714,131 @@ public static class BorderService
         }
     }
 
+    // IPC helpers
+    private static string NormalizeColor(string color)
+    {
+        if (string.IsNullOrWhiteSpace(color)) return "#0078FF";
+        var c = color.Trim();
+        if (!c.StartsWith("#")) c = "#" + c;
+        return c;
+    }
+
+    private static bool TrySendRefreshToOverlay()
+    {
+        var hwnd = FindOverlayWindow();
+        if (hwnd == IntPtr.Zero && IsExeModeRunning)
+        {
+            LogMessage("Overlay not ready, waiting briefly for REFRESH...");
+            hwnd = WaitForOverlayWindowReady();
+        }
+        if (hwnd == IntPtr.Zero) return false;
+        return TrySendCopyData(hwnd, $"REFRESH color={GetCurrentColorOrDefault()} thickness={GetCurrentThicknessOrDefault()}");
+    }
+
+    private static bool TrySendSettingsToOverlay(string colorHex, int thickness)
+    {
+        var hwnd = FindOverlayWindow();
+        if (hwnd == IntPtr.Zero && IsExeModeRunning)
+        {
+            LogMessage("Overlay not ready, waiting briefly for settings...");
+            hwnd = WaitForOverlayWindowReady();
+        }
+        if (hwnd == IntPtr.Zero) return false;
+        var msg = $"SET color={NormalizeColor(colorHex)} thickness={thickness}";
+        return TrySendCopyData(hwnd, msg);
+    }
+
+    private static IntPtr WaitForOverlayWindowReady(int timeoutMs = 1500, int intervalMs = 100)
+    {
+        var sw = Stopwatch.StartNew();
+        IntPtr h = IntPtr.Zero;
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            h = FindOverlayWindow();
+            if (h != IntPtr.Zero) return h;
+            Thread.Sleep(intervalMs);
+        }
+        return IntPtr.Zero;
+    }
+
+    private static IntPtr FindOverlayWindow()
+    {
+        try
+        {
+            // Try by class name first
+            var h = FindWindow(OverlayWindowClass, null);
+            if (h != IntPtr.Zero) return h;
+
+            // Fallback: enumerate all top-level windows and find matching class
+            IntPtr found = IntPtr.Zero;
+            EnumWindows((hwnd, lParam) =>
+            {
+                var sb = new System.Text.StringBuilder(128);
+                int len = GetClassName(hwnd, sb, sb.Capacity);
+                if (len > 0)
+                {
+                    var name = sb.ToString(0, len);
+                    if (string.Equals(name, OverlayWindowClass, StringComparison.Ordinal))
+                    {
+                        found = hwnd;
+                        return false; // stop
+                    }
+                }
+                return true; // continue
+            }, IntPtr.Zero);
+
+            if (found == IntPtr.Zero)
+                LogMessage("Overlay window not found for IPC (class BorderOverlayDCompWindowClass)");
+            else
+                LogMessage($"Overlay window found: 0x{found.ToInt64():X}");
+
+            return found;
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"FindOverlayWindow error: {ex.Message}");
+            return IntPtr.Zero;
+        }
+    }
+
+    private static bool TrySendCopyData(IntPtr hwnd, string message)
+    {
+        IntPtr dataPtr = IntPtr.Zero;
+        IntPtr cdsPtr = IntPtr.Zero;
+        try
+        {
+            LogMessage($"IPC -> hwnd=0x{hwnd.ToInt64():X}, msg='{message}'");
+            dataPtr = Marshal.StringToHGlobalUni(message);
+            var cds = new COPYDATASTRUCT
+            {
+                dwData = IntPtr.Zero,
+                cbData = (message.Length + 1) * 2,
+                lpData = dataPtr
+            };
+            cdsPtr = Marshal.AllocHGlobal(Marshal.SizeOf<COPYDATASTRUCT>());
+            Marshal.StructureToPtr(cds, cdsPtr, false);
+            IntPtr result;
+            var sendRes = SendMessageTimeout(hwnd, WM_COPYDATA, IntPtr.Zero, cdsPtr, SMTO_ABORTIFHUNG | SMTO_NORMAL, 300, out result);
+            if (sendRes == IntPtr.Zero)
+            {
+                var err = Marshal.GetLastWin32Error();
+                LogMessage($"IPC send failed (error={err})");
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"IPC send failed: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            if (cdsPtr != IntPtr.Zero) Marshal.FreeHGlobal(cdsPtr);
+            if (dataPtr != IntPtr.Zero) Marshal.FreeHGlobal(dataPtr);
+        }
+    }
+
     #region Windows API for DLL Loading
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr LoadLibrary(string lpFileName);
@@ -633,6 +848,30 @@ public static class BorderService
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+    #endregion
+
+    #region Windows API for IPC
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string lpClassName, string? lpWindowName);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct COPYDATASTRUCT
+    {
+        public IntPtr dwData;
+        public int cbData;
+        public IntPtr lpData;
+    }
+
+    internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
     #endregion
 }
 
