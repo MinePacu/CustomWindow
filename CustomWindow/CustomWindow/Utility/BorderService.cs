@@ -26,6 +26,12 @@ public static class BorderService
     private static int _lastThickness = 3;
     private static bool _lastShowConsole = false; // new: remember console preference
 
+    // New: render mode preference (Auto/Dwm/DComp)
+    private static string _renderModePreference = "Auto";
+
+    // Excluded processes cache (names without extension)
+    private static string[] _excluded = Array.Empty<string>();
+
     // IPC constants
     private const uint WM_COPYDATA = 0x004A;
     private const uint SMTO_NORMAL = 0x0000;
@@ -92,7 +98,7 @@ public static class BorderService
         {
             var pid = CurrentExePid;
             var path = GetRunningExePath();
-            return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 미확인" : path)}{(_lastShowConsole ? ", Console=Shown" : ", Console=Hidden")})";
+            return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 미확인" : path)}{(_lastShowConsole ? ", Console=Shown" : ", Console=Hidden")}, Mode={_renderModePreference})";
         }
         if (IsOverlayPresent())
         {
@@ -100,6 +106,25 @@ public static class BorderService
         }
         var info = GetExePathInfo();
         return info.Found ? $"EXE 파일 발견: {info.Path}" : "EXE 파일을 찾을 수 없음";
+    }
+
+    /// <summary>렌더 모드 선호 설정(Auto/Dwm/DComp)</summary>
+    public static void SetRenderModePreference(string mode)
+    {
+        lock (_sync)
+        {
+            var m = (mode ?? "Auto").Trim();
+            if (!string.Equals(_renderModePreference, m, StringComparison.OrdinalIgnoreCase))
+            {
+                _renderModePreference = m;
+                LogMessage($"Render mode preference set: {_renderModePreference}");
+                if (IsExeModeRunning)
+                {
+                    LogMessage("Restarting EXE to apply render mode change");
+                    RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
+                }
+            }
+        }
     }
 
     /// <summary>사용자 콘솔 표시 선호 설정</summary>
@@ -122,17 +147,50 @@ public static class BorderService
     {
         lock (_sync)
         {
+            _excluded = excludedProcesses ?? Array.Empty<string>();
+
             if (PreferExeMode)
             {
-                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")})");
+                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")}, Mode={_renderModePreference})");
                 // 콘솔 창 옵션을 사용자 설정에 맞게 시작
                 StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: _lastShowConsole);
+
+                // Subscribe to WindowTracker updates to push HWND list to overlay
+                try
+                {
+                    WindowTracker.WindowSetChanged -= OnWindowSetChanged;
+                    WindowTracker.WindowSetChanged += OnWindowSetChanged;
+                }
+                catch { }
                 return;
             }
 
             // DLL 모드 (옵션)
             LogMessage($"Starting in DLL mode (Color={borderColorHex}, Thickness={thickness})");
             StartWithDll(borderColorHex, thickness);
+        }
+    }
+
+    private static void OnWindowSetChanged(IReadOnlyCollection<nint> handles)
+    {
+        try
+        {
+            if (!OverlayAvailable) return;
+
+            // Apply exclusion: map to process names then filter
+            var detailed = WindowTracker.GetCurrentWindowsDetailed();
+            var excludedSet = new HashSet<string>(_excluded.Select(x => Path.GetFileNameWithoutExtension(x) ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+            var filtered = detailed
+                .Where(t => t.Handle != IntPtr.Zero)
+                .Where(t => string.IsNullOrEmpty(t.ProcessName) || !excludedSet.Contains(t.ProcessName!))
+                .Select(t => t.Handle)
+                .ToArray();
+
+            TrySendHwndListToOverlay(filtered);
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"OnWindowSetChanged error: {ex.Message}");
         }
     }
 
@@ -191,6 +249,8 @@ public static class BorderService
         {
             _postStartCts?.Cancel();
             _postStartCts = null;
+
+            try { WindowTracker.WindowSetChanged -= OnWindowSetChanged; } catch { }
 
             if (!_running && _winrtProc == null) return;
 
@@ -511,10 +571,32 @@ public static class BorderService
         LogMessage($"[Native {levelStr}] {message}");
     }
 
+    // 안전한 로그 이벤트 발행: 구독자 예외가 앱을 종료시키지 않도록 보호
+    private static void SafeRaiseLogReceived(string message)
+    {
+        try
+        {
+            var handlers = LogReceived;
+            if (handlers == null) return;
+            foreach (var del in handlers.GetInvocationList())
+            {
+                try
+                {
+                    ((Action<string>)del).Invoke(message);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[BorderService] LogReceived handler error: {ex}");
+                }
+            }
+        }
+        catch { }
+    }
+
     private static void LogMessage(string message)
     {
         var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|{CurrentModeTag}] {message}";
-        LogReceived?.Invoke(logLine);
+        SafeRaiseLogReceived(logLine);
         
         // WindowTracker 로그에도 추가
         WindowTracker.AddExternalLog(logLine);
@@ -524,7 +606,7 @@ public static class BorderService
     {
         if (string.IsNullOrWhiteSpace(message)) return;
         var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|EXE] {message}";
-        LogReceived?.Invoke(logLine);
+        SafeRaiseLogReceived(logLine);
         WindowTracker.AddExternalLog(logLine);
     }
 
@@ -552,7 +634,9 @@ public static class BorderService
     private static string BuildArgs(string borderColorHex, int thickness, bool withConsole)
     {
         var color = string.IsNullOrWhiteSpace(borderColorHex) ? "#0078FF" : borderColorHex.Trim();
-        return $"{(withConsole ? "--console " : string.Empty)}--color \"{color}\" --thickness {thickness}";
+        var modeArg = _renderModePreference.Equals("dwm", StringComparison.OrdinalIgnoreCase) ? "dwm" :
+                      _renderModePreference.Equals("dcomp", StringComparison.OrdinalIgnoreCase) ? "dcomp" : "auto";
+        return $"{(withConsole ? "--console " : string.Empty)}--mode {modeArg} --color \"{color}\" --thickness {thickness}";
     }
 
     private static string? FindWinRTExePath()
@@ -647,6 +731,7 @@ public static class BorderService
                     {
                         _winrtProc = null;
                         _running = false;
+                        try { WindowTracker.WindowSetChanged -= OnWindowSetChanged; } catch { }
                     }
                 };
 
@@ -662,6 +747,16 @@ public static class BorderService
                         TrySendCopyData(hwnd, $"SET color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()}");
                         TrySendCopyData(hwnd, $"REFRESH color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()}");
                         LogMessage("Overlay ready -> settings re-applied via IPC");
+
+                        // Push initial HWND list immediately
+                        var detailed = WindowTracker.GetCurrentWindowsDetailed();
+                        var excludedSet = new HashSet<string>(_excluded.Select(x => Path.GetFileNameWithoutExtension(x) ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+                        var filtered = detailed
+                            .Where(t => t.Handle != IntPtr.Zero)
+                            .Where(t => string.IsNullOrEmpty(t.ProcessName) || !excludedSet.Contains(t.ProcessName!))
+                            .Select(t => t.Handle)
+                            .ToArray();
+                        TrySendHwndListToOverlay(filtered);
                     }
                     else
                     {
@@ -745,6 +840,16 @@ public static class BorderService
         }
         if (hwnd == IntPtr.Zero) return false;
         var msg = $"SET color={NormalizeColor(colorHex)} thickness={thickness}";
+        return TrySendCopyData(hwnd, msg);
+    }
+
+    private static bool TrySendHwndListToOverlay(IReadOnlyCollection<nint> handles)
+    {
+        if (handles == null || handles.Count == 0) return false;
+        var hwnd = FindOverlayWindow();
+        if (hwnd == IntPtr.Zero) return false;
+        var parts = handles.Select(h => $"0x{((IntPtr)h).ToInt64():X}");
+        var msg = "HWNDS " + string.Join(' ', parts);
         return TrySendCopyData(hwnd, msg);
     }
 

@@ -21,6 +21,9 @@ public static class WindowTracker
     private static readonly ConcurrentQueue<string> _logs = new();
     public static event Action<string>? LogAdded;
 
+    // New: notify when window set changes (for EXE IPC)
+    public static event Action<IReadOnlyCollection<nint>>? WindowSetChanged;
+
     private class TrackedWindow
     {
         public nint Handle { get; init; }
@@ -30,7 +33,7 @@ public static class WindowTracker
         public DateTime LastSeen { get; set; } = DateTime.UtcNow;
     }
 
-    /// <summary>현재 추적 중인 윈도우 핸들 스냅샷.</summary>
+    /// <summary>현재 추적 중인 윈도우 핸들 목록.</summary>
     public static IReadOnlyCollection<nint> CurrentWindowHandles => _windows.Keys.ToList();
 
     /// <summary>최근 로그 전체 반환 (최신순)</summary>
@@ -46,7 +49,7 @@ public static class WindowTracker
         {
             if (_running)
             {
-                AddLog("이미 실행 중이어서 Start 무시");
+                AddLog("이미 실행 중이라 Start 무시");
                 return;
             }
             if (interval != null) _interval = interval.Value;
@@ -56,21 +59,22 @@ public static class WindowTracker
         }
     }
 
-    /// <summary>추적 종료 및 모든 캐시 정리</summary>
+    /// <summary>추적 중지 및 내부 캐시 클리어</summary>
     public static void Stop()
     {
         lock (_sync)
         {
             if (!_running)
             {
-                AddLog("실행 중이 아니어서 Stop 무시");
+                AddLog("추적 중이 아니라 Stop 무시");
                 return;
             }
             _running = false;
             _timer?.Dispose();
             _timer = null;
             _windows.Clear();
-            AddLog("추적 종료 및 목록 초기화");
+            AddLog("추적 중지 및 캐시 초기화");
+            try { WindowSetChanged?.Invoke(Array.Empty<nint>()); } catch { }
         }
     }
 
@@ -86,7 +90,7 @@ public static class WindowTracker
             {
                 if (!IsWindowVisible(hwnd)) { skippedInvisible++; return true; }
                 if (IsIconic(hwnd)) return true; // 최소화 창 제외
-                if (!HasNonEmptyTitle(hwnd)) return true; // 제목 없는 창 제외
+                if (!HasNonEmptyTitle(hwnd)) return true; // 캡션 없는 창 제외
                 if (!HasUsableRect(hwnd)) return true; // zero / off-screen
                 GetWindowThreadProcessId(hwnd, out var pid);
                 if (pid == 0) return true;
@@ -109,7 +113,7 @@ public static class WindowTracker
                 if (added) { addedCount++; AddLog($"추가: 0x{handle.ToInt64():X} PID={pid} {(SafeGetProcessName(pid) ?? "?")}"); }
                 seen.Add(handle);
                 return true;
-            }, 0);
+            }, IntPtr.Zero);
 
             int removed = 0;
             foreach (var kv in _windows.ToArray())
@@ -121,6 +125,9 @@ public static class WindowTracker
                 }
             }
             AddLog($"Tick: Active={seen.Count} Added={addedCount} Removed={removed} SkipInvisible={skippedInvisible}");
+
+            // Notify subscribers with the current set
+            try { WindowSetChanged?.Invoke(seen.ToArray()); } catch { }
         }
         catch (Exception ex)
         {
@@ -131,7 +138,7 @@ public static class WindowTracker
     private static bool HasNonEmptyTitle(nint hwnd)
     {
         int len = GetWindowTextLength(hwnd);
-        if (len <= 0 || len > 512) return false; // 방어적 한도
+        if (len <= 0 || len > 512) return false; // 유한한 한도
         var sb = new StringBuilder(len + 1);
         if (GetWindowText(hwnd, sb, sb.Capacity) <= 0) return false;
         return sb.ToString().Trim().Length > 0;
@@ -160,7 +167,7 @@ public static class WindowTracker
         try { return Process.GetProcessById((int)pid).ProcessName; } catch { return null; }
     }
 
-    /// <summary>외부 모듈(BorderService 등)에서 공용 로그 스트림에 추가하기 위한 헬퍼.</summary>
+    /// <summary>외부 모듈(BorderService 등)에서 전달한 로그 라인을 추가하기 위한 래퍼.</summary>
     public static void AddExternalLog(string message) => AddLog(message);
 
     private static void AddLog(string message)
@@ -168,15 +175,31 @@ public static class WindowTracker
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
         _logs.Enqueue(line);
         while (_logs.Count > _logCapacity && _logs.TryDequeue(out _)) { }
-        LogAdded?.Invoke(line);
+        // 안전 이벤트 발행: 개별 구독자 예외 격리
+        try
+        {
+            var handlers = LogAdded;
+            if (handlers != null)
+            {
+                foreach (var d in handlers.GetInvocationList())
+                {
+                    try { ((Action<string>)d).Invoke(line); }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[WindowTracker] LogAdded handler error: {ex}");
+                    }
+                }
+            }
+        }
+        catch { }
     }
 
     #region Win32 P/Invoke
 
-    private delegate bool EnumWindowsProc(IntPtr hWnd, int lParam);
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, int lParam);
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(nint hWnd);

@@ -16,6 +16,11 @@ public sealed partial class ObservableConfig : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         Changed?.Invoke(this, name);
+
+        if (name == nameof(RunOnBoot))
+        {
+            try { AutoStartManager.EnsureState(_cfg.RunOnBoot); } catch { }
+        }
     }
 
     private bool Set<T>(T current, T value, Action<T> assign, string name)
@@ -51,4 +56,5 @@ public sealed partial class ObservableConfig : INotifyPropertyChanged
     public bool ForceBorderColor { get => _cfg.ForceBorderColor; set => Set(_cfg.ForceBorderColor, value, v => _cfg.ForceBorderColor = v, nameof(ForceBorderColor)); }
     public int WindowApplyDelayMs { get => _cfg.WindowApplyDelayMs; set => Set(_cfg.WindowApplyDelayMs, value, v => _cfg.WindowApplyDelayMs = v, nameof(WindowApplyDelayMs)); }
     public bool ShowBorderServiceConsole { get => _cfg.ShowBorderServiceConsole; set => Set(_cfg.ShowBorderServiceConsole, value, v => _cfg.ShowBorderServiceConsole = v, nameof(ShowBorderServiceConsole)); }
+    public string BorderRenderMode { get => _cfg.BorderRenderMode; set => Set(_cfg.BorderRenderMode, value, v => _cfg.BorderRenderMode = v, nameof(BorderRenderMode)); }
 }

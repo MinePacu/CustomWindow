@@ -41,4 +41,7 @@ public sealed class AppConfig
     public bool ForceEmptyWindowTitles { get; set; }
     public bool ForceBorderColor { get; set; }
     public int WindowApplyDelayMs { get; set; } = 200;
+
+    // Border render method: "Auto", "Dwm", or "DComp"
+    public string BorderRenderMode { get; set; } = "Auto";
 }

@@ -100,9 +100,16 @@ namespace CustomWindow.Pages
         private void CopyWindowTrackerLogs_Click(object sender, RoutedEventArgs e)
         {
             if (WindowTrackerLogBox == null) return;
-            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            data.SetText(WindowTrackerLogBox.Text);
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+            try
+            {
+                var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                data.SetText(WindowTrackerLogBox.Text);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"클립보드 복사 실패: {ex.Message}");
+            }
         }
 
         private void ClearWindowTrackerLogs_Click(object sender, RoutedEventArgs e)

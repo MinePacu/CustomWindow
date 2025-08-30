@@ -69,6 +69,21 @@
                         IsOn="{x:Bind ViewModel.ShowBorderServiceConsole, Mode=TwoWay}"/>
                 </controls:SettingsCard>
 
+                <!-- New: Render method selection for debugging -->
+                <controls:SettingsCard
+                    Header="테두리 렌더 방식"
+                    Description="개발용: 운영체제 버전 무시하고 DWM/DComp 중 선택"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9A2;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ComboBox SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}">
+                        <x:String>Auto</x:String>
+                        <x:String>Dwm</x:String>
+                        <x:String>DComp</x:String>
+                    </ComboBox>
+                </controls:SettingsCard>
+
                 <controls:SettingsExpander
                     Header="제외 프로그램"
                     Description="제외할 프로그램 목록"

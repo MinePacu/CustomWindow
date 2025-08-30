@@ -16,7 +16,7 @@ public partial class NormalSettingsViewModel : ObservableObject
     public NormalSettingsViewModel(ObservableConfig cfg)
     {
         _config = cfg;
-        // 기본 제외 목록 추가 (중복 방지)
+        // 기본 제외 값 추가 (중복 방지)
         var set = new HashSet<string>(_config.Snapshot.ExcludedPrograms, System.StringComparer.OrdinalIgnoreCase);
         bool added = false;
         foreach (var d in _defaultExcludes)
@@ -56,7 +56,32 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    // 카드 설명: EXE 모드 상태 + DLL 가용성
+    // Render mode selection
+    public string BorderRenderMode
+    {
+        get => _config.BorderRenderMode;
+        set
+        {
+            if (_config.BorderRenderMode == value) return;
+            _config.BorderRenderMode = value;
+            OnPropertyChanged();
+
+            // Apply to service preference
+            BorderService.SetRenderModePreference(_config.BorderRenderMode);
+
+            if (AutoWindowChange)
+            {
+                // 재시작하여 즉시 반영
+                var borderHex = _config.BorderColor ?? "#0078FF";
+                BorderService.StopIfRunning();
+                BorderService.StartIfNeeded(borderHex, _config.BorderThickness, _config.Snapshot.ExcludedPrograms.ToArray());
+                WindowTracker.AddExternalLog($"렌더 방식 변경 -> {_config.BorderRenderMode} (재시작)");
+                CheckBorderServiceStatus();
+            }
+        }
+    }
+
+    //  상태 텍스트: EXE 모드 요약 + DLL 가용성
     public string BorderServiceStatusText
     {
         get
@@ -96,16 +121,17 @@ public partial class NormalSettingsViewModel : ObservableObject
                 var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 색상
                 int thickness = _config.BorderThickness;
                 BorderService.SetConsoleVisibilityPreference(_config.ShowBorderServiceConsole);
+                BorderService.SetRenderModePreference(_config.BorderRenderMode);
                 BorderService.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 
-                // (DLL 모드일 때만) 추가 설정
+                // (DLL 가용 시) 추가 설정
                 if (BorderServiceAvailable && BorderService.IsRunning)
                 {
-                    BorderService.SetPartialRatio(0.3f); // 30% 부분 업데이트
-                    BorderService.EnableMerge(true);     // 병합 활성화
+                    BorderService.SetPartialRatio(0.3f); // 30% 부분 렌더
+                    BorderService.EnableMerge(true);     // 머지 활성화
                 }
                 
-                WindowTracker.AddExternalLog("AutoWindowChange ON: BorderService 실행 요청");
+                WindowTracker.AddExternalLog("AutoWindowChange ON: BorderService 시작 요청");
             }
             else
             {
@@ -124,7 +150,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         get => string.Join("\n", _config.Snapshot.ExcludedPrograms);
         set
         {
-            // 중복 제거 처리 (한 줄씩)
+            // 중복 제거 처리 (줄 단위)
             _config.Snapshot.ExcludedPrograms.Clear();
             var set = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
             if (value != null)
@@ -133,7 +159,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 {
                     var line = raw.Trim();
                     if (line.Length == 0) continue;
-                    // 전체경로 입력해도 파일명만 추출
+                    // 전체경로 입력해도 파일명만 사용
                     try
                     {
                         line = System.IO.Path.GetFileName(line);
@@ -150,7 +176,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 _config.Snapshot.ExcludedPrograms.Add(item);
             OnPropertyChanged();
 
-            // AutoWindowChange 활성 상태면 BorderService를 재시작하여 설정 반영
+            // AutoWindowChange 활성 상태면 BorderService를 재시작하여 즉시 반영
             if (AutoWindowChange)
             {
                 BorderService.StopIfRunning();
@@ -162,13 +188,13 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    // AutoWindowChange on 중
+    // AutoWindowChange on 시
     public void OnBorderColorChanged()
     {
         if (AutoWindowChange)
         {
             var borderHex = _config.BorderColor ?? "#0078FF";
-            BorderService.UpdateColor(borderHex); // EXE 모드에서는 재시작
+            BorderService.UpdateColor(borderHex); // EXE 우선으로 반영
             CheckBorderServiceStatus();
         }
     }
@@ -176,7 +202,7 @@ public partial class NormalSettingsViewModel : ObservableObject
     {
         if (AutoWindowChange)
         {
-            BorderService.UpdateThickness(_config.BorderThickness); // EXE 모드에서는 재시작
+            BorderService.UpdateThickness(_config.BorderThickness); // EXE 우선으로 반영
             CheckBorderServiceStatus();
         }
     }
@@ -189,11 +215,11 @@ public partial class NormalSettingsViewModel : ObservableObject
             try
             {
                 BorderService.ForceRedraw();
-                WindowTracker.AddExternalLog("테두리 강제 다시 그리기 실행");
+                WindowTracker.AddExternalLog("테두리 강제 다시 그리기 요청");
             }
             catch (Exception ex)
             {
-                WindowTracker.AddExternalLog($"테두리 다시 그리기 중 오류 발생: {ex.Message}");
+                WindowTracker.AddExternalLog($"테두리 강제 다시 그리기 중 오류 발생: {ex.Message}");
             }
         }
         else

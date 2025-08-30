@@ -4,6 +4,7 @@
 
 // Windows & graphics headers
 #include <windows.h>
+#include <shellapi.h>
 #include <dwmapi.h>
 #include <d2d1_1.h>
 #include <dcomp.h>
@@ -22,3 +23,4 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "Shell32.lib")
