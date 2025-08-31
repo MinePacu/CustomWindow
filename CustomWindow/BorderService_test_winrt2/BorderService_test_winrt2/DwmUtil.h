@@ -10,3 +10,7 @@ std::vector<HWND> CollectUserVisibleWindows();
 void ApplyDwmAttributesToTargets(const std::vector<HWND>& targets);
 void ApplyDwmToAllCurrent();
 COLORREF ToCOLORREF(const D2D1_COLOR_F& c);
+
+// New: Corner handling
+void ApplyCornerPreference(HWND hwnd, const std::wstring& token);
+float CornerRadiusFromToken(const std::wstring& token);

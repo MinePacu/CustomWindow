@@ -104,6 +104,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Args.h" />
+    <ClInclude Include="ConsoleUtil.h" />
     <ClInclude Include="DwmUtil.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Logging.h" />
@@ -113,6 +114,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Args.cpp" />
+    <ClCompile Include="ConsoleUtil.cpp" />
     <ClCompile Include="DwmUtil.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="main.cpp" />

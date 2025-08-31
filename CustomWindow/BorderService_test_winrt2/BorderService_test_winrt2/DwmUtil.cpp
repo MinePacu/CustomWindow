@@ -2,6 +2,7 @@
 #include "Globals.h"
 #include "Logging.h"
 #include "DwmUtil.h"
+#include "Args.h"
 
 static bool IsWindowCloaked(HWND h)
 {
@@ -97,4 +98,24 @@ void ApplyDwmToAllCurrent()
         if (IsWindow(kv.first)) targets.push_back(kv.first);
     }
     ApplyDwmAttributesToTargets(targets);
+}
+
+void ApplyCornerPreference(HWND hwnd, const std::wstring& token)
+{
+    // Windows 11+: set DWMWA_WINDOW_CORNER_PREFERENCE
+    if (IsWindows11OrGreater()) {
+        DWORD pref = DWMWCP_DEFAULT;
+        if (token == L"donot") pref = DWMWCP_DONOTROUND;
+        else if (token == L"round") pref = DWMWCP_ROUND;
+        else if (token == L"roundsmall") pref = DWMWCP_ROUNDSMALL;
+        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref, sizeof(pref));
+    }
+}
+
+float CornerRadiusFromToken(const std::wstring& token)
+{
+    if (token == L"donot") return 0.0f;
+    if (token == L"roundsmall") return 6.0f; // small radius
+    if (token == L"round") return 12.0f;     // normal radius
+    return 8.0f; // default
 }

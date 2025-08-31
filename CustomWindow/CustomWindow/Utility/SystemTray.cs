@@ -11,6 +11,8 @@ internal static class SystemTray
 {
     private const int WM_APP_TRAY = 0x8000 + 100;
     private const int WM_LBUTTONDBLCLK = 0x0203;
+    private const int WM_RBUTTONUP = 0x0205;
+    private const int WM_CONTEXTMENU = 0x007B;
 
     private static IntPtr _msgWnd = IntPtr.Zero;
     private static WndProcDelegate? _wndProc;
@@ -74,11 +76,11 @@ internal static class SystemTray
             int lp = lParam.ToInt32();
             if (lp == WM_LBUTTONDBLCLK)
             {
-                try
-                {
-                    ShowMainWindow();
-                }
-                catch { }
+                try { ShowMainWindow(); } catch { }
+            }
+            else if (lp == WM_RBUTTONUP || lp == WM_CONTEXTMENU)
+            {
+                try { ShowContextMenu(hWnd); } catch { }
             }
             return IntPtr.Zero;
         }
@@ -92,6 +94,38 @@ internal static class SystemTray
         ShowWindow(hwnd, 9 /* SW_RESTORE */);
         SetForegroundWindow(hwnd);
         _winuiWindow.Activate();
+    }
+
+    private static void ShowContextMenu(IntPtr hostHwnd)
+    {
+        POINT pt;
+        GetCursorPos(out pt);
+        IntPtr menu = CreatePopupMenu();
+        // 1: Show, 2: Exit
+        AppendMenu(menu, 0x0000 /* MF_STRING */, new IntPtr(1), "창 출력하기");
+        AppendMenu(menu, 0x0000 /* MF_STRING */, new IntPtr(2), "닫기");
+        SetForegroundWindow(hostHwnd);
+        int cmd = TrackPopupMenu(menu, 0x0100 | 0x0002 /* TPM_RETURNCMD|TPM_RIGHTBUTTON */, pt.x, pt.y, 0, hostHwnd, IntPtr.Zero);
+        DestroyMenu(menu);
+        if (cmd == 1)
+        {
+            ShowMainWindow();
+        }
+        else if (cmd == 2)
+        {
+            try
+            {
+                if (_winuiWindow != null)
+                {
+                    _winuiWindow.DispatcherQueue.TryEnqueue(() => Application.Current?.Exit());
+                }
+                else
+                {
+                    Application.Current?.Exit();
+                }
+            }
+            catch { Environment.Exit(0); }
+        }
     }
 
     #region P/Invoke
@@ -120,7 +154,6 @@ internal static class SystemTray
         public uint uCallbackMessage;
         public IntPtr hIcon;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string szTip;
-        // struct truncated: we only need basic fields for add/delete
     }
 
     private const uint NIF_MESSAGE = 0x00000001;
@@ -128,6 +161,9 @@ internal static class SystemTray
     private const uint NIF_TIP = 0x00000004;
     private const uint NIM_ADD = 0x00000000;
     private const uint NIM_DELETE = 0x00000002;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x; public int y; }
 
     [DllImport("user32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
     private static extern ushort RegisterClass([In] ref WNDCLASS lpWndClass);
@@ -145,5 +181,11 @@ internal static class SystemTray
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern bool Shell_NotifyIcon(uint dwMessage, ref NOTIFYICONDATA lpdata);
+
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT lpPoint);
+    [DllImport("user32.dll")] private static extern IntPtr CreatePopupMenu();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool AppendMenu(IntPtr hMenu, uint uFlags, IntPtr uIDNewItem, string lpNewItem);
+    [DllImport("user32.dll")] private static extern int TrackPopupMenu(IntPtr hMenu, uint uFlags, int x, int y, int nReserved, IntPtr hWnd, IntPtr prcRect);
+    [DllImport("user32.dll")] private static extern bool DestroyMenu(IntPtr hMenu);
     #endregion
 }

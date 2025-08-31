@@ -65,9 +65,7 @@ public partial class NormalSettingsViewModel : ObservableObject
             if (_config.BorderRenderMode == value) return;
             _config.BorderRenderMode = value;
             OnPropertyChanged();
-
-            // Apply to service preference
-            BorderService.SetRenderModePreference(_config.BorderRenderMode);
+            BorderService.SetRenderModePreference(value);
 
             if (AutoWindowChange)
             {
@@ -228,7 +226,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    public string? WindowCornerMode { get => _config.WindowCornerMode; set { _config.WindowCornerMode = value; OnPropertyChanged(); } }
+    public string? WindowCornerMode { get => _config.WindowCornerMode; set { _config.WindowCornerMode = value; OnPropertyChanged(); BorderService.UpdateCornerMode(value); } }
 
     private bool _autoAdminApplying; // РќШЏ Сп
     public bool AutoAdmin

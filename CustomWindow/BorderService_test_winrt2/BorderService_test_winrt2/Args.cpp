@@ -1,8 +1,12 @@
 #include "pch.h"
 #include "Globals.h"
 #include "Logging.h"
+#include "ConsoleUtil.h"
+#include "Args.h"
 
 static bool ParseColorString(const wchar_t* hex, D2D1_COLOR_F& out);
+
+std::wstring g_cornerToken = L"default";
 
 bool IsWindows11OrGreater()
 {
@@ -47,6 +51,15 @@ void ParseArgsAndApply()
             continue;
         }
 
+        if (arg == L"--corner" && i + 1 < argc) {
+            g_cornerToken = tolower(argv[++i]);
+            continue;
+        }
+        if (arg.rfind(L"--corner=", 0) == 0) {
+            g_cornerToken = tolower(arg.substr(9));
+            continue;
+        }
+
         if (arg == L"--color" && i + 1 < argc) {
             D2D1_COLOR_F cf{};
             if (ParseColorString(argv[i + 1], cf)) { g_borderColor = cf; DebugLog(L"[Overlay] Arg color"); }
@@ -70,6 +83,12 @@ void ParseArgsAndApply()
     }
 
     LocalFree(argv);
+
+    if (g_console) {
+        EnsureConsole(true);
+        ConfigureConsoleWindow();
+        ShowConsole(true);
+    }
 
     if (g_mode == RenderMode::Auto) {
         g_mode = IsWindows11OrGreater() ? RenderMode::Dwm : RenderMode::DComp;

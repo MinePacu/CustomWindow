@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Globals.h"
 #include "DwmUtil.h"
+#include "Args.h"
 
 HRESULT CreateD3DDevice()
 {
@@ -120,11 +121,20 @@ void DrawBorders(ID2D1DeviceContext* ctx, const std::vector<RECT>& rects)
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
     ctx->CreateSolidColorBrush(g_borderColor, &brush);
     ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
+    const float radius = CornerRadiusFromToken(g_cornerToken);
+    const bool rounded = radius > 0.5f;
+
     for (const auto& r : rects)
     {
         D2D1_RECT_F rf = D2D1::RectF((FLOAT)r.left - (FLOAT)g_virtualScreen.left, (FLOAT)r.top - (FLOAT)g_virtualScreen.top,
                                      (FLOAT)r.right - (FLOAT)g_virtualScreen.left, (FLOAT)r.bottom - (FLOAT)g_virtualScreen.top);
-        ctx->DrawRectangle(rf, brush.Get(), g_thickness);
+        if (rounded) {
+            D2D1_ROUNDED_RECT rr{ rf, radius, radius };
+            ctx->DrawRoundedRectangle(rr, brush.Get(), g_thickness);
+        } else {
+            ctx->DrawRectangle(rf, brush.Get(), g_thickness);
+        }
     }
 }
 

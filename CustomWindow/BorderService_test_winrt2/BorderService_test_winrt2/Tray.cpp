@@ -4,10 +4,28 @@
 #include "OverlayDComp.h"
 #include "Logging.h"
 #include "Tray.h"
+#include "Args.h"
+#include "ConsoleUtil.h"
 
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(a) (sizeof(a)/sizeof((a)[0]))
 #endif
+
+static void HandleSettingsMessage(const std::wstring& msg)
+{
+    // Expect: SET color=#.. thickness=N corner=token or REFRESH ...
+    auto lower = msg; std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+    size_t cpos = lower.find(L"corner=");
+    if (cpos != std::wstring::npos) {
+        size_t start = cpos + 7; size_t end = lower.find_first_of(L" \r\n\t", start);
+        g_cornerToken = lower.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+    }
+
+    if (g_mode == RenderMode::Dwm) {
+        auto hwnds = CollectUserVisibleWindows();
+        for (HWND h : hwnds) ApplyCornerPreference(h, g_cornerToken);
+    }
+}
 
 LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -54,8 +72,13 @@ LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                         pos = end + 1;
                     }
                     ApplyDwmAttributesToTargets(targets);
+                    if (g_mode == RenderMode::Dwm) {
+                        for (HWND h : targets) ApplyCornerPreference(h, g_cornerToken);
+                    }
                 } else {
-                    PostMessageW(hwnd, WM_APP_REFRESH, 0, 0);
+                    HandleSettingsMessage(msgStr);
+                    if (g_mode == RenderMode::DComp)
+                        PostMessageW(hwnd, WM_APP_REFRESH, 0, 0);
                 }
             }
             return 0;
@@ -79,12 +102,27 @@ LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         } else if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
             POINT pt; GetCursorPos(&pt);
             HMENU menu = CreatePopupMenu();
-            AppendMenuW(menu, MF_STRING, 1, L"Exit BorderService");
+            AppendMenuW(menu, MF_STRING, 1, L"Show");
+            AppendMenuW(menu, MF_STRING, 2, L"Exit");
+            if (g_console && GetConsoleWindow()) {
+                AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+                AppendMenuW(menu, MF_STRING, 3, L"Hide Console");
+                AppendMenuW(menu, MF_STRING, 4, L"Show Console");
+            }
             SetForegroundWindow(hwnd);
             UINT cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
             DestroyMenu(menu);
             if (cmd == 1) {
+                if (g_overlay) {
+                    ShowWindow(g_overlay, SW_SHOW);
+                    SetForegroundWindow(g_overlay);
+                }
+            } else if (cmd == 2) {
                 PostQuitMessage(0);
+            } else if (cmd == 3) {
+                ShowConsole(false);
+            } else if (cmd == 4) {
+                ShowConsole(true);
             }
         }
         return 0;
