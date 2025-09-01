@@ -11,14 +11,82 @@
 #define ARRAYSIZE(a) (sizeof(a)/sizeof((a)[0]))
 #endif
 
+static bool ParseColorString(const std::wstring& hex, D2D1_COLOR_F& out)
+{
+    if (hex.empty()) return false;
+    std::wstring h = hex;
+    if (h[0] == L'#') h.erase(h.begin());
+    if (h.size() != 6 && h.size() != 8) return false;
+    
+    unsigned int val = 0;
+    try { 
+        val = std::stoul(h, nullptr, 16); 
+    } catch (...) { 
+        return false; 
+    }
+
+    float a = 1.0f, r = 0, g = 0, b = 0;
+    if (h.size() == 8) {
+        unsigned int A = (val >> 24) & 0xFF; 
+        unsigned int R = (val >> 16) & 0xFF; 
+        unsigned int G = (val >> 8) & 0xFF; 
+        unsigned int B = (val) & 0xFF;
+        a = A / 255.0f; r = R / 255.0f; g = G / 255.0f; b = B / 255.0f;
+    } else {
+        unsigned int R = (val >> 16) & 0xFF; 
+        unsigned int G = (val >> 8) & 0xFF; 
+        unsigned int B = (val) & 0xFF;
+        r = R / 255.0f; g = G / 255.0f; b = B / 255.0f; a = 1.0f;
+    }
+    out = D2D1::ColorF(r, g, b, a);
+    return true;
+}
+
 static void HandleSettingsMessage(const std::wstring& msg)
 {
     // Expect: SET color=#.. thickness=N corner=token or REFRESH ...
-    auto lower = msg; std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+    auto lower = msg; 
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+    
+    // Parse color
+    size_t colorPos = lower.find(L"color=");
+    if (colorPos != std::wstring::npos) {
+        size_t start = colorPos + 6;
+        size_t end = lower.find_first_of(L" \r\n\t", start);
+        std::wstring colorStr = msg.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+        
+        D2D1_COLOR_F newColor;
+        if (ParseColorString(colorStr, newColor)) {
+            g_borderColor = newColor;
+            DebugLog(L"[Overlay] Color updated: " + colorStr);
+        }
+    }
+    
+    // Parse thickness
+    size_t thickPos = lower.find(L"thickness=");
+    if (thickPos != std::wstring::npos) {
+        size_t start = thickPos + 10;
+        size_t end = lower.find_first_of(L" \r\n\t", start);
+        std::wstring thickStr = lower.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+        
+        try {
+            float newThickness = std::stof(thickStr);
+            if (newThickness > 0 && newThickness < 1000) {
+                g_thickness = newThickness;
+                DebugLog(L"[Overlay] Thickness updated: " + std::to_wstring(newThickness));
+            }
+        } catch (...) {
+            // Invalid thickness value
+        }
+    }
+    
+    // Parse corner
     size_t cpos = lower.find(L"corner=");
     if (cpos != std::wstring::npos) {
-        size_t start = cpos + 7; size_t end = lower.find_first_of(L" \r\n\t", start);
+        size_t start = cpos + 7; 
+        size_t end = lower.find_first_of(L" \r\n\t", start);
         g_cornerToken = lower.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+        DebugLog(L"[Overlay] Corner updated: " + g_cornerToken);
     }
 
     if (g_mode == RenderMode::Dwm) {

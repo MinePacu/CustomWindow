@@ -18,6 +18,7 @@ public partial class ColorSettingsViewModel : ObservableObject
                 case nameof(ObservableConfig.BorderColor): 
                     OnPropertyChanged(nameof(BorderColor)); 
                     OnPropertyChanged(nameof(BorderBrush)); 
+                    OnPropertyChanged(nameof(BorderColorHex));
                     UpdateBorderServiceColor();
                     break;
                 case nameof(ObservableConfig.CaptionColor): 
@@ -92,6 +93,8 @@ public partial class ColorSettingsViewModel : ObservableObject
             _config.BorderColor = hex; // triggers _config.Changed which raises BorderColor & BorderBrush
         }
     }
+
+    public string BorderColorHex => _config.BorderColor ?? "#FF4080FF";
 
     public Color CaptionColor
     {

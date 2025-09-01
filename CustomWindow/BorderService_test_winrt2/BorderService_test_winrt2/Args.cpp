@@ -107,11 +107,22 @@ static bool ParseColorString(const wchar_t* hex, D2D1_COLOR_F& out)
 
     float a = 1.0f, r = 0, g = 0, b = 0;
     if (h.size() == 8) {
-        unsigned int A = (val >> 24) & 0xFF; unsigned int R = (val >> 16) & 0xFF; unsigned int G = (val >> 8) & 0xFF; unsigned int B = (val) & 0xFF;
-        a = A / 255.0f; r = R / 255.0f; g = G / 255.0f; b = B / 255.0f;
+        unsigned int A = (val >> 24) & 0xFF; 
+        unsigned int R = (val >> 16) & 0xFF; 
+        unsigned int G = (val >> 8) & 0xFF; 
+        unsigned int B = (val) & 0xFF;
+        a = A / 255.0f; 
+        r = R / 255.0f; 
+        g = G / 255.0f; 
+        b = B / 255.0f;
     } else {
-        unsigned int R = (val >> 16) & 0xFF; unsigned int G = (val >> 8) & 0xFF; unsigned int B = (val) & 0xFF;
-        r = R / 255.0f; g = G / 255.0f; b = B / 255.0f; a = 1.0f;
+        unsigned int R = (val >> 16) & 0xFF; 
+        unsigned int G = (val >> 8) & 0xFF; 
+        unsigned int B = (val) & 0xFF;
+        r = R / 255.0f; 
+        g = G / 255.0f; 
+        b = B / 255.0f; 
+        a = 1.0f;
     }
     out = D2D1::ColorF(r, g, b, a);
     return true;

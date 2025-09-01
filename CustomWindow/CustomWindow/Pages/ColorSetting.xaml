@@ -25,15 +25,35 @@
                         <controls:SettingsCard Header="투명">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderTransparency, Mode=TwoWay}"/>
                         </controls:SettingsCard>
-                        <controls:SettingsCard Header="테두리 두께" Description="픽셀 단위로 설정합니다 (1-10)">
-                            <NumberBox Value="{x:Bind ViewModel.BorderThickness, Mode=TwoWay}" 
-                                      Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" 
-                                      SmallChange="1" LargeChange="1" Width="120"/>
+                        <controls:SettingsCard Header="테두리 두께" Description="픽셀 단위로 설정합니다 (1-20)">
+                            <StackPanel Orientation="Vertical" Spacing="8">
+                                <Slider x:Name="BorderThicknessSlider" 
+                                       Minimum="1" Maximum="20" StepFrequency="1" 
+                                       Value="{x:Bind ViewModel.BorderThickness, Mode=TwoWay}" 
+                                       ValueChanged="BorderThicknessSlider_ValueChanged"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="현재 두께:"/>
+                                    <TextBlock Text="{x:Bind ViewModel.BorderThickness, Mode=OneWay}" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
                         </controls:SettingsCard>
                         <controls:SettingsCard Header="색 선택">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" CornerRadius="4"/>
-                                <ColorPicker Color="{x:Bind ViewModel.BorderColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
+                            <StackPanel Orientation="Vertical" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="110" Height="25" Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" CornerRadius="4"/>
+                                    <ColorPicker x:Name="BorderColorPicker"
+                                               Color="{x:Bind ViewModel.BorderColor, Mode=TwoWay}" 
+                                               IsAlphaEnabled="True" 
+                                               IsAlphaSliderVisible="True"
+                                               IsHexInputVisible="True"
+                                               ColorChanged="BorderColorPicker_ColorChanged"
+                                               MinWidth="260" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock Text="HEX:" VerticalAlignment="Center"/>
+                                    <TextBox Width="120" Text="{x:Bind ViewModel.BorderColorHex, Mode=OneWay}" IsReadOnly="True"/>
+                                    <Border Width="24" Height="24" CornerRadius="4" BorderThickness="1" BorderBrush="#33000000" Background="{x:Bind ViewModel.BorderBrush}"/>
+                                </StackPanel>
                             </StackPanel>
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>

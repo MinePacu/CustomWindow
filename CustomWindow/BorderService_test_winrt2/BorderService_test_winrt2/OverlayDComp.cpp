@@ -216,6 +216,13 @@ void RefreshOverlay()
     ctx->BeginDraw();
     ctx->Clear(D2D1::ColorF(0, 0));
 
+    // Debug log current settings before drawing
+    DebugLog(L"[Overlay] Drawing with color: R=" + std::to_wstring(g_borderColor.r) + 
+             L" G=" + std::to_wstring(g_borderColor.g) + 
+             L" B=" + std::to_wstring(g_borderColor.b) + 
+             L" A=" + std::to_wstring(g_borderColor.a) + 
+             L" thickness=" + std::to_wstring(g_thickness));
+
     DrawBorders(ctx.Get(), rectsZ);
 
     if (SUCCEEDED(ctx->EndDraw())) {
