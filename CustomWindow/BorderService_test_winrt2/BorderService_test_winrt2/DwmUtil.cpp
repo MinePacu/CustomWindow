@@ -41,6 +41,11 @@ bool GetWindowBounds(HWND h, RECT& out)
 std::vector<HWND> CollectUserVisibleWindows()
 {
     std::vector<HWND> result;
+    HWND foregroundWnd = nullptr;
+    if (g_foregroundWindowOnly) {
+        foregroundWnd = GetForegroundWindow();
+    }
+    
     EnumWindows([](HWND h, LPARAM lParam) -> BOOL {
         auto& vec = *reinterpret_cast<std::vector<HWND>*>(lParam);
         if (!IsAltTabEligible(h)) return TRUE;
@@ -49,9 +54,25 @@ std::vector<HWND> CollectUserVisibleWindows()
 
         RECT inter{};
         if (IntersectRect(&inter, &rc, &g_virtualScreen) && (inter.right > inter.left) && (inter.bottom > inter.top))
+        {
             vec.push_back(h);
+        }
         return TRUE;
     }, reinterpret_cast<LPARAM>(&result));
+
+    // 포그라운드 창 전용 모드가 활성화된 경우, 포그라운드 창만 필터링
+    if (g_foregroundWindowOnly && foregroundWnd != nullptr)
+    {
+        std::vector<HWND> filtered;
+        for (HWND h : result)
+        {
+            if (h == foregroundWnd || GetAncestor(h, GA_ROOT) == foregroundWnd)
+            {
+                filtered.push_back(h);
+            }
+        }
+        return filtered;
+    }
 
     return result;
 }
@@ -71,22 +92,48 @@ void ApplyDwmAttributesToTargets(const std::vector<HWND>& targets)
     int thick = (int)g_thickness;
     if (thick < 1) thick = 1; else if (thick > 1000) thick = 1000;
 
+    // 새로운 적용 대상 목록 (targets는 이미 CollectUserVisibleWindows에서 필터링됨)
+    std::unordered_set<HWND, HwndHash, HwndEq> newTargets;
+
     for (HWND h : targets) {
         if (!IsWindow(h)) continue;
+        
+        newTargets.insert(h);
+        
         auto it = g_applied.find(h);
         if (it != g_applied.end() && it->second.color == cr && it->second.thickness == thick) {
-            continue; // already applied
+            continue; // already applied with same settings
         }
         HRESULT hr1 = DwmSetWindowAttribute(h, DWMWA_BORDER_COLOR, &cr, sizeof(cr));
         HRESULT hr2 = DwmSetWindowAttribute(h, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS, &thick, sizeof(thick));
         if (SUCCEEDED(hr1) || SUCCEEDED(hr2)) {
             g_applied[h] = { cr, thick };
+            DebugLog(L"[DWM] Applied border to window 0x" + std::to_wstring(reinterpret_cast<uintptr_t>(h)));
         }
     }
 
+    // 새로운 적용 대상에 포함되지 않은 창들을 기본값으로 복원
     for (auto it = g_applied.begin(); it != g_applied.end(); ) {
-        if (!IsWindow(it->first)) it = g_applied.erase(it); else ++it;
+        if (!IsWindow(it->first)) {
+            it = g_applied.erase(it);
+            continue;
+        }
+        
+        // 새로운 적용 대상에 포함되지 않은 창들을 기본값으로 복원
+        if (newTargets.find(it->first) == newTargets.end()) {
+            COLORREF defaultColor = RGB(0, 0, 0); // 기본 색상 (투명)
+            int defaultThick = 1; // 기본 두께
+            DwmSetWindowAttribute(it->first, DWMWA_BORDER_COLOR, &defaultColor, sizeof(defaultColor));
+            DwmSetWindowAttribute(it->first, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS, &defaultThick, sizeof(defaultThick));
+            DebugLog(L"[DWM] Restored default border for window 0x" + std::to_wstring(reinterpret_cast<uintptr_t>(it->first)));
+            it = g_applied.erase(it);
+        } else {
+            ++it;
+        }
     }
+    
+    DebugLog(L"[DWM] Applied borders to " + std::to_wstring(newTargets.size()) + 
+             L" windows, total tracked: " + std::to_wstring(g_applied.size()));
 }
 
 void ApplyDwmToAllCurrent()
@@ -98,6 +145,35 @@ void ApplyDwmToAllCurrent()
         if (IsWindow(kv.first)) targets.push_back(kv.first);
     }
     ApplyDwmAttributesToTargets(targets);
+}
+
+// 포그라운드 모드 변경 시 모든 상태를 재설정하는 함수
+void ResetAndApplyDwmAttributes()
+{
+    if (g_mode != RenderMode::Dwm) return;
+    
+    DebugLog(L"[DWM] Resetting all DWM attributes due to foreground mode change");
+    
+    // 모든 이전 적용을 기본값으로 복원
+    COLORREF defaultColor = RGB(0, 0, 0);
+    int defaultThick = 1;
+    
+    for (auto it = g_applied.begin(); it != g_applied.end(); ++it) {
+        if (IsWindow(it->first)) {
+            DwmSetWindowAttribute(it->first, DWMWA_BORDER_COLOR, &defaultColor, sizeof(defaultColor));
+            DwmSetWindowAttribute(it->first, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS, &defaultThick, sizeof(defaultThick));
+            DebugLog(L"[DWM] Reset window 0x" + std::to_wstring(reinterpret_cast<uintptr_t>(it->first)));
+        }
+    }
+    
+    // 적용 맵 완전 초기화
+    g_applied.clear();
+    
+    // 새로운 설정으로 적용
+    auto hwnds = CollectUserVisibleWindows();
+    ApplyDwmAttributesToTargets(hwnds);
+    
+    DebugLog(L"[DWM] Reset complete, applied to " + std::to_wstring(hwnds.size()) + L" windows");
 }
 
 void ApplyCornerPreference(HWND hwnd, const std::wstring& token)

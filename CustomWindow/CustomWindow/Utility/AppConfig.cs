@@ -24,6 +24,7 @@ public sealed class AppConfig
 
     // Normal settings
     public bool AutoWindowChange { get; set; }
+    public bool ForegroundWindowOnly { get; set; } // 포그라운드 창에서만 테두리 표시
     public List<string> ExcludedPrograms { get; set; } = new();
     public string? WindowCornerMode { get; set; }
     public bool AutoAdmin { get; set; }

@@ -36,6 +36,17 @@ void ParseArgsAndApply()
         std::wstring arg = tolower(argv[i]);
         if (arg == L"--console") { g_console = true; continue; }
 
+        if (arg == L"--foregroundonly" && i + 1 < argc) {
+            std::wstring v = tolower(argv[i + 1]);
+            g_foregroundWindowOnly = (v == L"1" || v == L"true" || v == L"on");
+            ++i; continue;
+        }
+        if (arg.rfind(L"--foregroundonly=", 0) == 0) {
+            std::wstring v = tolower(arg.substr(17));
+            g_foregroundWindowOnly = (v == L"1" || v == L"true" || v == L"on");
+            continue;
+        }
+
         if (arg == L"--mode" && i + 1 < argc) {
             std::wstring v = tolower(argv[i + 1]);
             if (v == L"dwm") g_mode = RenderMode::Dwm;

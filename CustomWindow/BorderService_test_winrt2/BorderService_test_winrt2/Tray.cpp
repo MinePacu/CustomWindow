@@ -44,9 +44,21 @@ static bool ParseColorString(const std::wstring& hex, D2D1_COLOR_F& out)
 
 static void HandleSettingsMessage(const std::wstring& msg)
 {
-    // Expect: SET color=#.. thickness=N corner=token or REFRESH ...
+    // Expect: SET foregroundonly=0/1 color=#.. thickness=N corner=token or REFRESH ...
     auto lower = msg; 
     std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+    
+    bool wasForgroundOnly = g_foregroundWindowOnly;
+    
+    // Parse foregroundonly
+    size_t fgPos = lower.find(L"foregroundonly=");
+    if (fgPos != std::wstring::npos) {
+        size_t start = fgPos + 15;
+        size_t end = lower.find_first_of(L" \r\n\t", start);
+        std::wstring fgStr = lower.substr(start, end == std::wstring::npos ? 1 : end - start);
+        g_foregroundWindowOnly = (fgStr == L"1" || fgStr == L"true");
+        DebugLog(L"[Overlay] ForegroundWindowOnly updated: " + std::to_wstring(g_foregroundWindowOnly));
+    }
     
     // Parse color
     size_t colorPos = lower.find(L"color=");
@@ -87,6 +99,24 @@ static void HandleSettingsMessage(const std::wstring& msg)
         size_t end = lower.find_first_of(L" \r\n\t", start);
         g_cornerToken = lower.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
         DebugLog(L"[Overlay] Corner updated: " + g_cornerToken);
+    }
+
+    // 포그라운드 옵션이 변경된 경우 즉시 처리
+    if (wasForgroundOnly != g_foregroundWindowOnly) {
+        DebugLog(L"[Overlay] Foreground mode changed from " + std::to_wstring(wasForgroundOnly) + 
+                 L" to " + std::to_wstring(g_foregroundWindowOnly));
+        
+        if (g_mode == RenderMode::Dwm) {
+            // DWM 모드에서는 전체 상태를 재설정
+            ResetAndApplyDwmAttributes();
+            DebugLog(L"[Overlay] Reset and reapplied all DWM attributes due to foreground mode change");
+        } else if (g_mode == RenderMode::DComp) {
+            // DComp 모드에서는 즉시 새로고침 트리거
+            if (g_overlay) {
+                PostMessageW(g_overlay, WM_APP_REFRESH, 0, 0);
+                DebugLog(L"[Overlay] Triggered DComp refresh due to foreground mode change");
+            }
+        }
     }
 
     if (g_mode == RenderMode::Dwm) {
@@ -139,6 +169,21 @@ LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                         if (end == std::wstring::npos) break;
                         pos = end + 1;
                     }
+                    
+                    // 포그라운드 전용 모드에서는 받은 창 목록을 다시 필터링
+                    if (g_foregroundWindowOnly) {
+                        HWND foregroundWnd = GetForegroundWindow();
+                        std::vector<HWND> filteredTargets;
+                        for (HWND h : targets) {
+                            if (h == foregroundWnd || GetAncestor(h, GA_ROOT) == foregroundWnd) {
+                                filteredTargets.push_back(h);
+                            }
+                        }
+                        targets = filteredTargets;
+                        DebugLog(L"[Overlay] Applied foreground filtering to HWNDS message: " + 
+                                std::to_wstring(filteredTargets.size()) + L" windows remaining");
+                    }
+                    
                     ApplyDwmAttributesToTargets(targets);
                     if (g_mode == RenderMode::Dwm) {
                         for (HWND h : targets) ApplyCornerPreference(h, g_cornerToken);
@@ -276,6 +321,18 @@ void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD eventId, HWND hwnd, LONG idObjec
     if (eventId >= EVENT_OBJECT_CREATE && eventId <= EVENT_OBJECT_HIDE) {
         if (idObject != OBJID_WINDOW || hwnd == nullptr) return;
     }
+    
+    // 포그라운드 창 전용 모드에서는 포그라운드 창 변경 시 즉시 업데이트
+    if (g_foregroundWindowOnly && eventId == EVENT_SYSTEM_FOREGROUND) {
+        if (g_overlay && g_mode == RenderMode::DComp) {
+            LRESULT res{};
+            if (!SendMessageTimeoutW(g_overlay, WM_APP_REFRESH, 0, 0, SMTO_NORMAL, 50, reinterpret_cast<PDWORD_PTR>(&res))) {
+                PostMessageW(g_overlay, WM_APP_REFRESH, 0, 0);
+            }
+        }
+        return;
+    }
+    
     if (g_overlay && g_mode == RenderMode::DComp) {
         LRESULT res{};
         if (!SendMessageTimeoutW(g_overlay, WM_APP_REFRESH, 0, 0, SMTO_NORMAL, 50, reinterpret_cast<PDWORD_PTR>(&res))) {

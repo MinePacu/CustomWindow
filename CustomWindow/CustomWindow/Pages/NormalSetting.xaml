@@ -35,6 +35,22 @@
                         IsOn="{x:Bind ViewModel.AutoWindowChange, Mode=TwoWay}"/>
                 </controls:SettingsCard>
 
+                <!-- 새로 추가: 포그라운드 창 전용 옵션 -->
+                <controls:SettingsCard
+                    Header="포그라운드 창에서만 테두리 표시"
+                    Description="활성 창(포그라운드)에서만 테두리를 표시합니다. AutoChangeWindow가 활성화된 상태에서만 동작합니다."
+                    Margin="0, 0, 0, 3"
+                    IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon 
+                            FontFamily="Segoe Fluent Icons" 
+                            Glyph="&#xE8A7;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ToggleSwitch 
+                        IsOn="{x:Bind ViewModel.ForegroundWindowOnly, Mode=TwoWay}"
+                        IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
+                </controls:SettingsCard>
+
                 <!-- BorderService 상태 표시 -->
                 <controls:SettingsCard
                     Header="테두리 서비스 상태"

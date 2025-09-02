@@ -30,6 +30,9 @@ public static class BorderService
     // New: render mode preference (Auto/Dwm/DComp)
     private static string _renderModePreference = "Auto";
 
+    // New: foreground window only mode
+    private static bool _foregroundWindowOnly = false;
+
     // Excluded processes cache (names without extension)
     private static string[] _excluded = Array.Empty<string>();
 
@@ -195,7 +198,7 @@ public static class BorderService
 
             if (PreferExeMode)
             {
-                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")}, Mode={_renderModePreference}, Corner={_lastCorner})");
+                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")}, Mode={_renderModePreference}, Corner={_lastCorner}, ForegroundOnly={_foregroundWindowOnly})");
                 // 콘솔 창 옵션을 사용자 설정에 맞게 시작
                 StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: _lastShowConsole);
 
@@ -660,7 +663,8 @@ public static class BorderService
         var modeArg = _renderModePreference.Equals("dwm", StringComparison.OrdinalIgnoreCase) ? "dwm" :
                       _renderModePreference.Equals("dcomp", StringComparison.OrdinalIgnoreCase) ? "dcomp" : "auto";
         var cornerArg = _lastCorner; // normalized
-        return $"{(withConsole ? "--console " : string.Empty)}--mode {modeArg} --color \"{color}\" --thickness {thickness} --corner {cornerArg}";
+        var foregroundArg = _foregroundWindowOnly ? "1" : "0";
+        return $"{(withConsole ? "--console " : string.Empty)}--mode {modeArg} --color \"{color}\" --thickness {thickness} --corner {cornerArg} --foregroundonly {foregroundArg}";
     }
 
     private static string? FindWinRTExePath()
@@ -784,8 +788,8 @@ public static class BorderService
         return TrySendCopyData(hwnd, msg);
     }
 
-    private static string BuildSettingsMessage() => $"SET color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
-    private static string BuildRefreshMessage() => $"REFRESH color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
+    private static string BuildSettingsMessage() => $"SET foregroundonly={(_foregroundWindowOnly ? "1" : "0")} color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
+    private static string BuildRefreshMessage() => $"REFRESH foregroundonly={(_foregroundWindowOnly ? "1" : "0")} color={NormalizeColor(GetCurrentColorOrDefault())} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
 
     private static bool TrySendRefreshToOverlay()
     {
@@ -955,6 +959,77 @@ public static class BorderService
     [StructLayout(LayoutKind.Sequential)] private struct COPYDATASTRUCT { public IntPtr dwData; public int cbData; public IntPtr lpData; }
     internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     #endregion
+
+    /// <summary>포그라운드 창 전용 모드 설정</summary>
+    public static void SetForegroundWindowOnly(bool foregroundOnly)
+    {
+        lock (_sync)
+        {
+            if (_foregroundWindowOnly == foregroundOnly) return;
+            
+            var previousMode = _foregroundWindowOnly;
+            _foregroundWindowOnly = foregroundOnly;
+            LogMessage($"Foreground window only mode: {(previousMode ? "Enabled" : "Disabled")} -> {(_foregroundWindowOnly ? "Enabled" : "Disabled")}");
+            
+            // EXE 모드에서는 메시지로 전달
+            if (OverlayAvailable)
+            {
+                var msg = $"SET foregroundonly={(foregroundOnly ? "1" : "0")} color={GetCurrentColorOrDefault()} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
+                var hwnd = FindOverlayWindow();
+                if (hwnd != IntPtr.Zero)
+                {
+                    TrySendCopyData(hwnd, msg);
+                    
+                    // 포그라운드 옵션 변경 후 충분한 시간을 두고 창 목록을 다시 전송
+                    System.Threading.Tasks.Task.Delay(200).ContinueWith(_ =>
+                    {
+                        try
+                        {
+                            // 전체 창 목록을 다시 수집하여 전송 (필터링은 C++ 쪽에서 처리)
+                            var allDetails = WindowTracker.GetCurrentWindowsDetailed();
+                            var excludedSet = new HashSet<string>(_excluded.Select(x => Path.GetFileNameWithoutExtension(x) ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+                            var allWindows = allDetails.Where(t => t.Handle != IntPtr.Zero)
+                                                      .Where(t => string.IsNullOrEmpty(t.ProcessName) || !excludedSet.Contains(t.ProcessName!))
+                                                      .Select(t => t.Handle)
+                                                      .ToArray();
+                        
+                            TrySendHwndListToOverlay(allWindows);
+                            LogMessage($"Sent complete window list ({allWindows.Length} windows) after foreground mode change");
+                            
+                            // 추가 새로고침 요청 (두 번째 새로고침으로 확실히 반영)
+                            System.Threading.Tasks.Task.Delay(100).ContinueWith(__ =>
+                            {
+                                TrySendRefreshToOverlay();
+                                LogMessage("Sent final refresh after foreground mode change");
+                            }, System.Threading.Tasks.TaskScheduler.Default);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogMessage($"Failed to send window list after foreground mode change: {ex.Message}");
+                        }
+                    }, System.Threading.Tasks.TaskScheduler.Default);
+                }
+                else if (IsExeModeRunning)
+                {
+                    LogMessage("Restarting EXE to apply foreground window only change");
+                    RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
+                }
+            }
+            else if (_host != null && _running)
+            {
+                // DLL 모드에서는 강제 다시 그리기
+                try 
+                { 
+                    _host.ForceRedraw(); 
+                    LogMessage("Force redraw executed after foreground mode change (DLL)");
+                }
+                catch (Exception ex) 
+                { 
+                    LogMessage($"Failed to force redraw after foreground mode change (DLL): {ex.Message}"); 
+                }
+            }
+        }
+    }
 }
 
 /// <summary>C++ BorderServiceHost와의 상호운용을 위한 래퍼 클래스</summary>

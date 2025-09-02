@@ -19,6 +19,7 @@ extern RenderMode g_mode;
 extern bool g_console;
 extern D2D1_COLOR_F g_borderColor;
 extern float g_thickness;
+extern bool g_foregroundWindowOnly; // 새로 추가: 포그라운드 창 전용 모드
 
 extern HWND g_overlay;
 extern RECT g_virtualScreen;

@@ -120,6 +120,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 int thickness = _config.BorderThickness;
                 BorderService.SetConsoleVisibilityPreference(_config.ShowBorderServiceConsole);
                 BorderService.SetRenderModePreference(_config.BorderRenderMode);
+                BorderService.SetForegroundWindowOnly(_config.ForegroundWindowOnly); // 새로운 옵션 적용
                 BorderService.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 
                 // (DLL 가용 시) 추가 설정
@@ -140,6 +141,40 @@ public partial class NormalSettingsViewModel : ObservableObject
 
             // 상태 갱신
             CheckBorderServiceStatus();
+        }
+    }
+
+    public bool ForegroundWindowOnly
+    {
+        get => _config.ForegroundWindowOnly;
+        set
+        {
+            if (_config.ForegroundWindowOnly == value) return;
+            
+            var previousValue = _config.ForegroundWindowOnly;
+            _config.ForegroundWindowOnly = value;
+            OnPropertyChanged();
+            
+            // AutoWindowChange가 활성화된 경우 즉시 적용
+            if (AutoWindowChange)
+            {
+                BorderService.SetForegroundWindowOnly(value);
+                WindowTracker.AddExternalLog($"포그라운드 창 전용 모드: {(previousValue ? "활성화" : "비활성화")} -> {(value ? "활성화" : "비활성화")}");
+                
+                // 상태 변경 후 추가적인 강제 새로고침 (1초 후)
+                System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+                {
+                    try
+                    {
+                        BorderService.ForceRedraw();
+                        WindowTracker.AddExternalLog("포그라운드 옵션 변경 후 최종 강제 새로고침 완료");
+                    }
+                    catch (Exception ex)
+                    {
+                        WindowTracker.AddExternalLog($"포그라운드 옵션 변경 후 최종 강제 새로고침 실패: {ex.Message}");
+                    }
+                }, System.Threading.Tasks.TaskScheduler.Default);
+            }
         }
     }
 

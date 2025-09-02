@@ -221,7 +221,9 @@ void RefreshOverlay()
              L" G=" + std::to_wstring(g_borderColor.g) + 
              L" B=" + std::to_wstring(g_borderColor.b) + 
              L" A=" + std::to_wstring(g_borderColor.a) + 
-             L" thickness=" + std::to_wstring(g_thickness));
+             L" thickness=" + std::to_wstring(g_thickness) +
+             L" foregroundOnly=" + std::to_wstring(g_foregroundWindowOnly) +
+             L" windowCount=" + std::to_wstring(rectsZ.size()));
 
     DrawBorders(ctx.Get(), rectsZ);
 
