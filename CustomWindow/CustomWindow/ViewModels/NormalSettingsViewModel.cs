@@ -261,7 +261,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    public string? WindowCornerMode { get => _config.WindowCornerMode; set { _config.WindowCornerMode = value; OnPropertyChanged(); BorderService.UpdateCornerMode(value); } }
+    public string? WindowCornerMode { get => _config.WindowCornerMode; set { _config.WindowCornerMode = value; BorderService.UpdateCornerMode(value); } }
 
     private bool _autoAdminApplying; // РќШЏ Сп
     public bool AutoAdmin
