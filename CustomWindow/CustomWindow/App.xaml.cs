@@ -17,7 +17,7 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using CustomWindow.Utility;
 using System.Reflection;
-using IOPath = System.IO.Path; // 별칭으로 모호성 해결
+using IOPath = System.IO.Path;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 
@@ -74,36 +74,6 @@ namespace CustomWindow
                 }
                 catch { }
             };
-            
-            // DLL 로딩 준비
-            SetupNativeDllLoading();
-        }
-
-        private void SetupNativeDllLoading()
-        {
-            try
-            {
-                // 현재 디렉토리를 실행 파일 위치로 설정
-                var exeDir = IOPath.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                if (!string.IsNullOrEmpty(exeDir))
-                {
-                    Directory.SetCurrentDirectory(exeDir);
-                }
-
-                // DLL 로드 시도
-                var dllLoaded = NativeDllLoader.LoadBorderServiceDll();
-                
-                // 로그를 위한 메시지
-                var message = dllLoaded 
-                    ? "Native DLL loading setup completed successfully"
-                    : "Native DLL loading setup completed (DLL not found - will use fallback)";
-                    
-                System.Diagnostics.Debug.WriteLine($"[App] {message}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[App] DLL loading setup failed: {ex.Message}");
-            }
         }
 
         /// <summary>
@@ -116,6 +86,33 @@ namespace CustomWindow
 
             // Apply autostart state at app startup
             try { AutoStartManager.EnsureState(ConfigStore.Config.RunOnBoot); } catch { }
+
+            // Apply BorderService settings if AutoWindowChange is enabled
+            if (ConfigStore.Config.AutoWindowChange)
+            {
+                try
+                {
+                    // WindowStyleApplier 초기화 (캡션 색상 모드 적용)
+                    WindowStyleApplier.Initialize(ConfigStore.Config);
+                    
+                    // Apply all BorderService preferences before starting
+                    BorderService.SetConsoleVisibilityPreference(ConfigStore.Config.ShowBorderServiceConsole);
+                    BorderService.SetRenderModePreference(ConfigStore.Config.BorderRenderMode);
+                    BorderService.SetForegroundWindowOnly(ConfigStore.Config.ForegroundWindowOnly);
+                    BorderService.UpdateCornerMode(ConfigStore.Config.WindowCornerMode);
+
+                    // Start BorderService with configured settings
+                    WindowTracker.Start();
+                    var borderHex = ConfigStore.Config.BorderColor ?? "#0078FF";
+                    BorderService.StartIfNeeded(borderHex, ConfigStore.Config.BorderThickness, ConfigStore.Config.Snapshot.ExcludedPrograms.ToArray());
+                    
+                    WindowTracker.AddExternalLog($"App startup: BorderService auto-started (Corner={ConfigStore.Config.WindowCornerMode ?? "기본"})");
+                }
+                catch (Exception ex)
+                {
+                    WindowTracker.AddExternalLog($"Failed to auto-start BorderService: {ex.Message}");
+                }
+            }
 
             _window = new MainWindow();
             _window.Activate();
@@ -153,8 +150,8 @@ namespace CustomWindow
                 try
                 {
                     BorderService.StopIfRunning();
+                    WindowStyleApplier.Stop();
                     WindowTracker.Stop();
-                    NativeDllLoader.UnloadBorderServiceDll();
                     SystemTray.Dispose();
                     if (ConfigStore != null)
                         await ConfigStore.FlushAsync();
@@ -169,8 +166,8 @@ namespace CustomWindow
                     if (ConfigStore?.Config.MinimizeToTray != true)
                     {
                         BorderService.StopIfRunning();
+                        WindowStyleApplier.Stop();
                         WindowTracker.Stop();
-                        NativeDllLoader.UnloadBorderServiceDll();
                         SystemTray.Dispose();
                     }
                 }

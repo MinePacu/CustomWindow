@@ -6,8 +6,6 @@
 
 static bool ParseColorString(const wchar_t* hex, D2D1_COLOR_F& out);
 
-std::wstring g_cornerToken = L"default";
-
 bool IsWindows11OrGreater()
 {
     typedef LONG (WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);

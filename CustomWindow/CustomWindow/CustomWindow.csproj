@@ -11,7 +11,6 @@
     <Nullable>enable</Nullable>
 	<WindowsPackageType>None</WindowsPackageType>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <!-- DLL 경로를 PATH에 추가 -->
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
@@ -65,83 +64,7 @@
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
 
-  <!-- C++ 프로젝트 참조 -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\BorderServiceCpp\BorderServiceCpp.vcxproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
-  </ItemGroup>
-
-  <!-- 다중 경로에서 DLL 복사 시도 -->
-  <Target Name="CopyBorderServiceNative" AfterTargets="Build">
-    <PropertyGroup>
-      <!-- 가능한 모든 빌드 경로들 -->
-      <BorderServicePath1>$(MSBuildProjectDirectory)\..\..\..\x64\$(Configuration)\BorderServiceCpp.dll</BorderServicePath1>
-      <BorderServicePath2>$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\x64\$(Configuration)\BorderServiceCpp.dll</BorderServicePath2>
-      <BorderServicePath3>$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\$(Configuration)\BorderServiceCpp.dll</BorderServicePath3>
-      <BorderServicePath4>$(OutDir)BorderServiceCpp.dll</BorderServicePath4>
-    </PropertyGroup>
-
-    <!-- 첫 번째 경로에서 시도 -->
-    <ItemGroup Condition="Exists('$(BorderServicePath1)')">
-      <_NativeDll Include="$(BorderServicePath1)" />
-      <_NativePdb Include="$(MSBuildProjectDirectory)\..\..\..\x64\$(Configuration)\BorderServiceCpp.pdb" Condition="Exists('$(MSBuildProjectDirectory)\..\..\..\x64\$(Configuration)\BorderServiceCpp.pdb')" />
-    </ItemGroup>
-    
-    <!-- 두 번째 경로에서 시도 -->
-    <ItemGroup Condition="Exists('$(BorderServicePath2)') AND '@(_NativeDll)' == ''">
-      <_NativeDll Include="$(BorderServicePath2)" />
-      <_NativePdb Include="$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\x64\$(Configuration)\BorderServiceCpp.pdb" Condition="Exists('$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\x64\$(Configuration)\BorderServiceCpp.pdb')" />
-    </ItemGroup>
-    
-    <!-- 세 번째 경로에서 시도 -->
-    <ItemGroup Condition="Exists('$(BorderServicePath3)') AND '@(_NativeDll)' == ''">
-      <_NativeDll Include="$(BorderServicePath3)" />
-      <_NativePdb Include="$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\$(Configuration)\BorderServiceCpp.pdb" Condition="Exists('$(MSBuildProjectDirectory)\..\..\..\BorderServiceCpp\$(Configuration)\BorderServiceCpp.pdb')" />
-    </ItemGroup>
-    
-    <!-- DLL 복사 -->
-    <Copy SourceFiles="@(_NativeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="@(_NativeDll) != ''" />
-    <Message Importance="High" Text="[CopyBorderServiceNative] ? Copied BorderServiceCpp.dll from @(_NativeDll) to $(OutDir)" Condition="@(_NativeDll) != ''" />
-    
-    <!-- PDB 복사 -->
-    <Copy SourceFiles="@(_NativePdb)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="@(_NativePdb) != ''" />
-    <Message Importance="High" Text="[CopyBorderServiceNative] ? Copied BorderServiceCpp.pdb to $(OutDir)" Condition="@(_NativePdb) != ''" />
-    
-    <!-- 경고 메시지들 -->
-    <Message Importance="High" Text="[CopyBorderServiceNative] ? No BorderServiceCpp.dll found in any expected location:" Condition="@(_NativeDll) == ''" />
-    <Message Importance="High" Text="[CopyBorderServiceNative]   - $(BorderServicePath1)" Condition="@(_NativeDll) == ''" />
-    <Message Importance="High" Text="[CopyBorderServiceNative]   - $(BorderServicePath2)" Condition="@(_NativeDll) == ''" />
-    <Message Importance="High" Text="[CopyBorderServiceNative]   - $(BorderServicePath3)" Condition="@(_NativeDll) == ''" />
-  </Target>
-
-  <!-- 빌드 후 DLL 존재 확인 -->
-  <Target Name="VerifyNativeDll" AfterTargets="CopyBorderServiceNative">
-    <PropertyGroup>
-      <FinalDllPath>$(OutDir)BorderServiceCpp.dll</FinalDllPath>
-    </PropertyGroup>
-    <Message Importance="High" Text="[VerifyNativeDll] ? BorderServiceCpp.dll is present at $(FinalDllPath)" Condition="Exists('$(FinalDllPath)')" />
-    <Message Importance="High" Text="[VerifyNativeDll] ? BorderServiceCpp.dll is MISSING at $(FinalDllPath)" Condition="!Exists('$(FinalDllPath)')" />
-    
-    <!-- 출력 디렉토리의 모든 DLL 파일 나열 -->
-    <ItemGroup>
-      <AllDlls Include="$(OutDir)*.dll" />
-    </ItemGroup>
-    <Message Importance="High" Text="[VerifyNativeDll] Available DLLs in output directory:" />
-    <Message Importance="High" Text="[VerifyNativeDll]   - %(AllDlls.Filename)%(AllDlls.Extension)" />
-  </Target>
-
-  <!-- Content 항목으로 DLL 포함 (추가 보장) -->
-  <ItemGroup>
-    <Content Include="..\..\..\x64\Debug\BorderServiceCpp.dll" Condition="Exists('..\..\..\x64\Debug\BorderServiceCpp.dll')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\x64\Release\BorderServiceCpp.dll" Condition="Exists('..\..\..\x64\Release\BorderServiceCpp.dll')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <!-- 기존 PreBuild의 잘못된 xcopy 제거, 대신 Build 이후에 EXE를 복사(존재할 때만) -->
+  <!-- Copy BorderService WinRT EXE to output directory -->
   <Target Name="CopyBorderServiceWinRT" AfterTargets="Build">
     <PropertyGroup>
       <WinRTExe1>$(SolutionDir)CustomWindow\BorderService_test_winrt2\BorderService_test_winrt2\x64\$(Configuration)\BorderService_test_winrt2.exe</WinRTExe1>

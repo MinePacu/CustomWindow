@@ -23,15 +23,35 @@ public partial class ColorSettingsViewModel : ObservableObject
                     break;
                 case nameof(ObservableConfig.CaptionColor): 
                     OnPropertyChanged(nameof(CaptionColor)); 
-                    OnPropertyChanged(nameof(CaptionBrush)); 
+                    OnPropertyChanged(nameof(CaptionBrush));
+                    // 캡션 색상이 변경되면 모든 창에 스타일 재적용
+                    if (_config.CaptionColorMode == "커스텀" || _config.CaptionColorMode == "Custom")
+                    {
+                        WindowStyleApplier.RefreshAllWindows();
+                    }
                     break;
                 case nameof(ObservableConfig.CaptionTextColor): 
                     OnPropertyChanged(nameof(CaptionTextColor)); 
-                    OnPropertyChanged(nameof(CaptionTextBrush)); 
+                    OnPropertyChanged(nameof(CaptionTextBrush));
+                    // 캡션 텍스트 색상이 변경되면 모든 창에 스타일 재적용
+                    if (_config.CaptionTextColorMode == "커스텀" || _config.CaptionTextColorMode == "Custom")
+                    {
+                        WindowStyleApplier.RefreshAllWindows();
+                    }
                     break;
                 case nameof(ObservableConfig.BorderThickness):
                     OnPropertyChanged(nameof(BorderThickness));
                     UpdateBorderServiceThickness();
+                    break;
+                case nameof(ObservableConfig.CaptionColorMode):
+                    OnPropertyChanged(nameof(CaptionColorMode));
+                    // 캡션 색상 모드가 변경되면 모든 창에 스타일 재적용
+                    WindowStyleApplier.RefreshAllWindows();
+                    break;
+                case nameof(ObservableConfig.CaptionTextColorMode):
+                    OnPropertyChanged(nameof(CaptionTextColorMode));
+                    // 캡션 텍스트 색상 모드가 변경되면 모든 창에 스타일 재적용
+                    WindowStyleApplier.RefreshAllWindows();
                     break;
             }
         };
@@ -139,8 +159,10 @@ public partial class ColorSettingsViewModel : ObservableObject
     public bool UseCaptionTransparency { get => _config.UseCaptionTransparency; set { _config.UseCaptionTransparency = value; OnPropertyChanged(); } }
     public bool UseCaptionTextSystemColor { get => _config.UseCaptionTextSystemColor; set { _config.UseCaptionTextSystemColor = value; OnPropertyChanged(); } }
     public bool UseCaptionTextTransparency { get => _config.UseCaptionTextTransparency; set { _config.UseCaptionTextTransparency = value; OnPropertyChanged(); } }
-    public string? CaptionTextColorMode { get => _config.CaptionTextColorMode; set { _config.CaptionTextColorMode = value; OnPropertyChanged(); } }
-    public string? CaptionColorMode { get => _config.CaptionColorMode; set { _config.CaptionColorMode = value; OnPropertyChanged(); } }
+    
+    // Fix: Remove OnPropertyChanged() from setters - ObservableConfig already handles notifications via Changed event
+    public string? CaptionTextColorMode { get => _config.CaptionTextColorMode; set => _config.CaptionTextColorMode = value; }
+    public string? CaptionColorMode { get => _config.CaptionColorMode; set => _config.CaptionColorMode = value; }
 
     public void ToggleBorderDemo() => BorderColor = BorderColor.R == 0x40 ? Color.FromArgb(0xFF, 0xFF, 0x80, 0x00) : Color.FromArgb(0xFF, 0x40, 0x80, 0xFF);
     public void ToggleCaptionDemo() => CaptionColor = CaptionColor.R == 0x20 ? Color.FromArgb(0xFF, 0x30, 0x30, 0x30) : Color.FromArgb(0xFF, 0x20, 0x20, 0x20);

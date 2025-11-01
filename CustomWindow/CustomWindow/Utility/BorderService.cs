@@ -13,24 +13,19 @@ namespace CustomWindow.Utility;
 public static class BorderService
 {
     private static Process? _winrtProc;
-    private static BorderServiceCppHost? _host;
     private static readonly object _sync = new();
     private static bool _running = false;
-    private static CancellationTokenSource? _postStartCts;
-
-    // Prefer EXE mode by default
-    private const bool PreferExeMode = true;
 
     // Keep last used values for EXE restart scenarios
     private static string _lastColor = "#0078FF";
     private static int _lastThickness = 3;
-    private static bool _lastShowConsole = false; // new: remember console preference
+    private static bool _lastShowConsole = false;
     private static string _lastCorner = "default"; // normalized tokens: default|donot|round|roundsmall
 
-    // New: render mode preference (Auto/Dwm/DComp)
+    // Render mode preference (Auto/Dwm/DComp)
     private static string _renderModePreference = "Auto";
 
-    // New: foreground window only mode
+    // Foreground window only mode
     private static bool _foregroundWindowOnly = false;
 
     // Excluded processes cache (names without extension)
@@ -43,50 +38,33 @@ public static class BorderService
     private const string OverlayWindowClass = "BorderOverlayDCompWindowClass";
 
     // 로그 이벤트
-    public static event Action<string>? LogReceived;    
-
-    // 정적 생성자: EXE 모드 선호 시 DLL 선로딩 생략
-    static BorderService()
-    {
-        if (!PreferExeMode)
-        {
-            try
-            {
-                NativeDllLoader.LoadBorderServiceDll();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Static constructor DLL load failed: {ex.Message}");
-            }
-        }
-    }
+    public static event Action<string>? LogReceived;
 
     /// <summary>현재 모드 태그</summary>
-    private static string CurrentModeTag
-        => (IsExeModeRunning ? "EXE" : (_host != null ? "DLL" : "IDLE"));
+    private static string CurrentModeTag => (IsExeModeRunning ? "EXE" : "IDLE");
 
-    /// <summary>EXE 모드 실행 여부</summary>
+    /// <summary>EXE 모드 실행 상태</summary>
     public static bool IsExeModeRunning => _winrtProc != null && !_winrtProc.HasExited;
 
-    /// <summary>외부에서 실행된 오버레이 윈도우 존재 여부</summary>
+    /// <summary>외부에서 실행된 오버레이 윈도우 존재 확인</summary>
     private static bool IsOverlayPresent()
     {
         try { return FindOverlayWindow() != IntPtr.Zero; } catch { return false; }
     }
-  
-    /// <summary>오버레이(내부 EXE 또는 외부) 사용 가능 여부</summary>
+
+    /// <summary>오버레이(현재 EXE 또는 외부) 사용 가능 상태</summary>
     private static bool OverlayAvailable => IsExeModeRunning || IsOverlayPresent();
 
     /// <summary>현재 실행 중인 EXE PID</summary>
     public static int? CurrentExePid => IsExeModeRunning ? _winrtProc!.Id : null;
 
-    /// <summary>실행 중인 EXE의 전체 경로(가능한 경우)</summary>
+    /// <summary>현재 실행 EXE의 전체 경로(가능한 경우)</summary>
     public static string? GetRunningExePath()
     {
         try { return _winrtProc?.MainModule?.FileName; } catch { return null; }
     }
 
-    /// <summary>EXE 파일 존재 여부와 경로(실행 중이면 해당 경로, 아니면 검색)</summary>
+    /// <summary>EXE 경로 정보 조회(현재 실행이면 해당 경로, 아니면 검색)</summary>
     public static (bool Found, string? Path) GetExePathInfo()
     {
         var runningPath = GetRunningExePath();
@@ -95,7 +73,7 @@ public static class BorderService
         return (!string.IsNullOrEmpty(path), path);
     }
 
-    /// <summary>요약 상태 문자열 (EXE 전용)</summary>
+    /// <summary>상태 요약 문자열 (EXE 전용)</summary>
     public static string GetExeStatusSummary()
     {
         if (IsExeModeRunning)
@@ -104,9 +82,9 @@ public static class BorderService
             var path = GetRunningExePath();
             return $"EXE 실행 중 (PID={pid}, {(string.IsNullOrEmpty(path) ? "경로 확인불가" : path)}{(_lastShowConsole ? ", Console=Shown" : ", Console=Hidden")}, Mode={_renderModePreference}, Corner={_lastCorner})";
         }
-        if (IsOverlayPresent()) return "오버레이가 표시중입니다.";
+        if (IsOverlayPresent()) return "오버레이가 표시됩니다.";
         var info = GetExePathInfo();
-        return info.Found ? $"EXE 후보: {info.Path}" : "EXE 파일을 찾을 수 없음";
+        return info.Found ? $"EXE 검색: {info.Path}" : "EXE 파일을 찾을 수 없음";
     }
 
     /// <summary>렌더 모드 선호 설정(Auto/Dwm/DComp)</summary>
@@ -128,7 +106,7 @@ public static class BorderService
         }
     }
 
-    /// <summary>사용자 콘솔 표시 선호 설정</summary>
+    /// <summary>선호된 콘솔 표시 선호 설정</summary>
     public static void SetConsoleVisibilityPreference(bool show)
     {
         lock (_sync)
@@ -143,7 +121,7 @@ public static class BorderService
         }
     }
 
-    // New: update window corner mode
+    /// <summary>Update window corner mode</summary>
     public static void UpdateCornerMode(string? mode)
     {
         lock (_sync)
@@ -168,10 +146,6 @@ public static class BorderService
                     TrySendRefreshToOverlay();
                 }
             }
-            else if (_host != null && _running)
-            {
-                try { _host.ForceRedraw(); } catch { }
-            }
         }
     }
 
@@ -184,7 +158,7 @@ public static class BorderService
             "기본" => "default",
             "둥글게 하지 않음" => "donot",
             "둥글게" => "round",
-            "덜 둥글게" => "roundsmall",
+            "약 둥글게" => "roundsmall",
             _ => m.ToLowerInvariant()
         };
     }
@@ -196,25 +170,16 @@ public static class BorderService
         {
             _excluded = excludedProcesses ?? Array.Empty<string>();
 
-            if (PreferExeMode)
+            LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")}, Mode={_renderModePreference}, Corner={_lastCorner}, ForegroundOnly={_foregroundWindowOnly})");
+            StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: _lastShowConsole);
+
+            // Subscribe to WindowTracker updates to push HWND list to overlay
+            try
             {
-                LogMessage($"Starting in EXE mode (Color={borderColorHex}, Thickness={thickness}, Console={(_lastShowConsole ? "Show" : "Hide")}, Mode={_renderModePreference}, Corner={_lastCorner}, ForegroundOnly={_foregroundWindowOnly})");
-                // 콘솔 창 옵션을 사용자 설정에 맞게 시작
-                StartWinRTConsole(borderColorHex, thickness, exePath: null, showConsole: _lastShowConsole);
-
-                // Subscribe to WindowTracker updates to push HWND list to overlay
-                try
-                {
-                    WindowTracker.WindowSetChanged -= OnWindowSetChanged;
-                    WindowTracker.WindowSetChanged += OnWindowSetChanged;
-                }
-                catch { }
-                return;
+                WindowTracker.WindowSetChanged -= OnWindowSetChanged;
+                WindowTracker.WindowSetChanged += OnWindowSetChanged;
             }
-
-            // DLL 모드 (옵션)
-            LogMessage($"Starting in DLL mode (Color={borderColorHex}, Thickness={thickness})");
-            StartWithDll(borderColorHex, thickness);
+            catch { }
         }
     }
 
@@ -241,71 +206,17 @@ public static class BorderService
         }
     }
 
-    private static void StartWithDll(string borderColorHex, int thickness)
-    {
-        if (_running && _host != null)
-        {
-            LogMessage("BorderService already running - updating settings");
-            UpdateColor(borderColorHex);
-            UpdateThickness(thickness);
-            return;
-        }
-
-        try
-        {
-            var argbColor = ParseColor(borderColorHex);
-            _host = new BorderServiceCppHost(argbColor, thickness, debug: true);
-            _host.LogReceived += OnNativeLogReceived;
-
-            _postStartCts?.Cancel();
-            _postStartCts = new CancellationTokenSource();
-            var token = _postStartCts.Token;
-
-            System.Threading.Tasks.Task.Delay(500, token).ContinueWith(t =>
-            {
-                if (t.IsCanceled) return;
-                try
-                {
-                    lock (_sync)
-                    {
-                        if (_running && _host != null)
-                            _host.ForceRedraw();
-                    }
-                    LogMessage("Triggered border assignment for visible windows");
-                }
-                catch (Exception ex)
-                {
-                    LogMessage($"Failed to trigger border assignment: {ex.Message}");
-                }
-            }, System.Threading.Tasks.TaskScheduler.Default);
-
-            _running = true;
-            LogMessage("BorderService started successfully (DLL)");
-        }
-        catch (Exception ex)
-        {
-            LogMessage($"Failed to start BorderService (DLL): {ex.Message}");
-            SafeStop();
-        }
-    }
-
-    /// <summary>BorderService 중지</summary>
+    /// <summary>BorderService 정지</summary>
     public static void StopIfRunning()
     {
         lock (_sync)
         {
-            _postStartCts?.Cancel();
-            _postStartCts = null;
-
             try { WindowTracker.WindowSetChanged -= OnWindowSetChanged; } catch { }
 
             if (!_running && _winrtProc == null) return;
 
             LogMessage("Stopping BorderService");
-            // EXE 모드 우선 종료
             StopWinRTConsoleIfRunning();
-            // DLL 모드 종료
-            SafeStop();
             LogMessage("BorderService stopped");
         }
     }
@@ -332,18 +243,6 @@ public static class BorderService
                     return;
                 }
             }
-
-            // DLL 모드가 살아있다면(테스트/백업 용)
-            if (_host != null && _running)
-            {
-                try
-                {
-                    var argbColor = ParseColor(borderColorHex);
-                    _host.UpdateColor(argbColor);
-                    LogMessage($"Color updated to {borderColorHex} (DLL)");
-                }
-                catch (Exception ex) { LogMessage($"Failed to update color (DLL): {ex.Message}"); }
-            }
         }
     }
 
@@ -369,13 +268,6 @@ public static class BorderService
                     return;
                 }
             }
-
-            // DLL 모드(백업)
-            if (_host != null && _running)
-            {
-                try { _host.UpdateThickness(thickness); LogMessage($"Thickness updated to {thickness} (DLL)"); }
-                catch (Exception ex) { LogMessage($"Failed to update thickness (DLL): {ex.Message}"); }
-            }
         }
     }
 
@@ -394,53 +286,7 @@ public static class BorderService
                 return;
             }
 
-            if (_host != null && _running)
-            {
-                try { _host.ForceRedraw(); LogMessage("Force redraw executed (DLL)"); }
-                catch (Exception ex) { LogMessage($"Failed to force redraw (DLL): {ex.Message}"); }
-            }
-            else
-            {
-                LogMessage("Force redraw requested (not running)");
-            }
-        }
-    }
-
-    /// <summary>부분 렌더링 비율 설정</summary>
-    public static void SetPartialRatio(float ratio)
-    {
-        lock (_sync)
-        {
-            if (OverlayAvailable)
-            {
-                LogMessage("SetPartialRatio is not supported in EXE mode.");
-                return;
-            }
-
-            if (_host != null && _running)
-            {
-                try { _host.SetPartialRatio(ratio); LogMessage($"Partial ratio set to {ratio:F2} (DLL)"); }
-                catch (Exception ex) { LogMessage($"Failed to set partial ratio (DLL): {ex.Message}"); }
-            }
-        }
-    }
-
-    /// <summary>오버랩 병합 활성화/비활성화</summary>
-    public static void EnableMerge(bool enable)
-    {
-        lock (_sync)
-        {
-            if (OverlayAvailable)
-            {
-                LogMessage("EnableMerge is not supported in EXE mode.");
-                return;
-            }
-
-            if (_host != null && _running)
-            {
-                try { _host.EnableMerge(enable); LogMessage($"Merge {(enable ? "enabled" : "disabled")} (DLL)"); }
-                catch (Exception ex) { LogMessage($"Failed to set merge mode (DLL): {ex.Message}"); }
-            }
+            LogMessage("Force redraw requested (not running)");
         }
     }
 
@@ -451,153 +297,27 @@ public static class BorderService
         {
             lock (_sync)
             {
-                var exeOrOverlay = OverlayAvailable;
-                var dllRunning = _running && _host != null;
-                return exeOrOverlay || dllRunning;
+                return OverlayAvailable;
             }
         }
     }
 
-    /// <summary>DLL 파일 경로 정보</summary>
-    public static string GetDllSearchInfo()
+    private static void LogMessage(string message)
     {
-        var currentDir = Directory.GetCurrentDirectory();
-        var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
-        
-        var paths = new[]
-        {
-            Path.Combine(currentDir, "BorderServiceCpp.dll"),
-            Path.Combine(exeDir, "BorderServiceCpp.dll"),
-            Path.Combine(appDir, "BorderServiceCpp.dll")
-        };
-        
-        var info = $"DLL Search Paths:\n";
-        info += $"Current Directory: {currentDir}\n";
-        info += $"Executable Directory: {exeDir}\n";
-        info += $"App Domain Directory: {appDir}\n\n";
-        
-        foreach (var path in paths)
-        {
-            info += $"{path}: {(File.Exists(path) ? "EXISTS" : "NOT FOUND")}\n";
-        }
-        
-        return info;
+        var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|{CurrentModeTag}] {message}";
+        SafeRaiseLogReceived(logLine);
+        WindowTracker.AddExternalLog(logLine);
     }
 
-    /// <summary>DLL 로드 가능 여부 확인</summary>
-    public static bool IsDllAvailable()
+    private static void LogExeOutput(string message)
     {
-        try
-        {
-            // 먼저 DLL 파일 위치 로깅
-            LogMessage(GetDllSearchInfo());
-            
-            // LoadLibrary를 사용하여 DLL 수동 로드 시도
-            var dllPath = FindDllPath();
-            if (!string.IsNullOrEmpty(dllPath))
-            {
-                LogMessage($"Found DLL at: {dllPath}");
-                
-                // 수동으로 DLL 로드
-                var handle = LoadLibrary(dllPath);
-                if (handle != IntPtr.Zero)
-                {
-                    LogMessage("DLL loaded successfully with LoadLibrary");
-                    FreeLibrary(handle);
-                }
-                else
-                {
-                    var error = Marshal.GetLastWin32Error();
-                    LogMessage($"LoadLibrary failed with error: {error}");
-                }
-            }
-            
-            // DLL 로드 테스트
-            var testPtr = BorderServiceCppHost.BS_CreateContext(unchecked((int)0xFF000000), 2, 0);
-            if (testPtr != IntPtr.Zero)
-            {
-                BorderServiceCppHost.BS_DestroyContext(testPtr);
-                LogMessage("DLL function call test successful");
-                return true;
-            }
-        }
-        catch (DllNotFoundException ex)
-        {
-            LogMessage($"BorderServiceCpp.dll not found: {ex.Message}");
-        }
-        catch (EntryPointNotFoundException ex)
-        {
-            LogMessage($"DLL entry point not found: {ex.Message}");
-        }
-        catch (BadImageFormatException ex)
-        {
-            LogMessage($"DLL format error (architecture mismatch?): {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            LogMessage($"DLL test failed: {ex.Message}");
-        }
-        return false;
+        if (string.IsNullOrWhiteSpace(message)) return;
+        var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|EXE] {message}";
+        SafeRaiseLogReceived(logLine);
+        WindowTracker.AddExternalLog(logLine);
     }
 
-    private static string? FindDllPath()
-    {
-        var searchPaths = new []
-        {
-            Directory.GetCurrentDirectory(),
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "",
-            AppDomain.CurrentDomain.BaseDirectory,
-            Environment.CurrentDirectory
-        };
-        
-        foreach (var searchPath in searchPaths)
-        {
-            var dllPath = Path.Combine(searchPath, "BorderServiceCpp.dll");
-            if (File.Exists(dllPath))
-            {
-                return dllPath;
-            }
-        }
-        
-        return null;
-    }
-
-    private static void SafeStop()
-    {
-        try
-        {
-            if (_host != null)
-            {
-                _host.LogReceived -= OnNativeLogReceived;
-                _host.Dispose();
-                _host = null;
-            }
-        }
-        catch (Exception ex)
-        {
-            LogMessage($"Error during BorderService cleanup: {ex.Message}");
-        }
-        finally
-        {
-            _running = false;
-        }
-    }
-
-    private static void OnNativeLogReceived(int level, string message)
-    {
-        var levelStr = level switch
-        {
-            0 => "INFO",
-            1 => "WARN", 
-            2 => "ERROR",
-            _ => $"L{level}"
-        };
-        
-        LogMessage($"[Native {levelStr}] {message}");
-    }
-
-    // 안전한 로그 이벤트 발행: 구독자 예외가 앱을 종료시키지 않도록 보호
+    // 안전한 로그 이벤트 발생: 구독자 예외가 전파되지 않도록 보호
     private static void SafeRaiseLogReceived(string message)
     {
         try
@@ -619,50 +339,12 @@ public static class BorderService
         catch { }
     }
 
-    private static void LogMessage(string message)
-    {
-        var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|{CurrentModeTag}] {message}";
-        SafeRaiseLogReceived(logLine);
-        
-        // WindowTracker 로그에도 추가
-        WindowTracker.AddExternalLog(logLine);
-    }
-
-    private static void LogExeOutput(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message)) return;
-        var logLine = $"[{DateTime.Now:HH:mm:ss}] [BorderService|EXE] {message}";
-        SafeRaiseLogReceived(logLine);
-        WindowTracker.AddExternalLog(logLine);
-    }
-
-    private static int ParseColor(string hex)
-    {
-        if (string.IsNullOrWhiteSpace(hex)) return unchecked((int)0xFF000000);
-        
-        var h = hex.Trim();
-        if (h.StartsWith("#")) h = h[1..];
-        
-        if (h.Length == 6)
-        {
-            if (int.TryParse(h, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb))
-                return unchecked((int)(0xFF000000 | (uint)rgb));
-        }
-        else if (h.Length == 8)
-        {
-            if (int.TryParse(h, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var argb))
-                return argb;
-        }
-        
-        return unchecked((int)0xFF000000);
-    }
-
     private static string BuildArgs(string borderColorHex, int thickness, bool withConsole)
     {
         var color = string.IsNullOrWhiteSpace(borderColorHex) ? "#0078FF" : borderColorHex.Trim();
         var modeArg = _renderModePreference.Equals("dwm", StringComparison.OrdinalIgnoreCase) ? "dwm" :
                       _renderModePreference.Equals("dcomp", StringComparison.OrdinalIgnoreCase) ? "dcomp" : "auto";
-        var cornerArg = _lastCorner; // normalized
+        var cornerArg = _lastCorner;
         var foregroundArg = _foregroundWindowOnly ? "1" : "0";
         return $"{(withConsole ? "--console " : string.Empty)}--mode {modeArg} --color \"{color}\" --thickness {thickness} --corner {cornerArg} --foregroundonly {foregroundArg}";
     }
@@ -691,7 +373,7 @@ public static class BorderService
     private static string GetCurrentColorOrDefault() => _lastColor;
     private static int GetCurrentThicknessOrDefault() => _lastThickness;
 
-    /// <summary>BorderServiceWinRT 콘솔 시작</summary>
+    /// <summary>BorderServiceWinRT 콘솔 실행</summary>
     public static void StartWinRTConsole(string borderColorHex, int thickness, string? exePath = null, bool showConsole = true)
     {
         lock (_sync)
@@ -773,7 +455,7 @@ public static class BorderService
             catch (Exception ex)
             {
                 LogMessage($"Failed to start BorderServiceWinRT (EXE): {ex.Message}");
-                SafeStop();
+                _running = false;
             }
         }
     }
@@ -938,7 +620,7 @@ public static class BorderService
             }
         }
         catch { }
-        finally { _winrtProc = null; }
+        finally { _winrtProc = null; _running = false; }
     }
 
     private static string NormalizeColor(string color)
@@ -948,9 +630,6 @@ public static class BorderService
     }
 
     #region Win32
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr LoadLibrary(string lpFileName);
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool FreeLibrary(IntPtr hModule);
-
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern IntPtr FindWindow(string lpClassName, string? lpWindowName);
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -966,12 +645,12 @@ public static class BorderService
         lock (_sync)
         {
             if (_foregroundWindowOnly == foregroundOnly) return;
-            
+
             var previousMode = _foregroundWindowOnly;
             _foregroundWindowOnly = foregroundOnly;
             LogMessage($"Foreground window only mode: {(previousMode ? "Enabled" : "Disabled")} -> {(_foregroundWindowOnly ? "Enabled" : "Disabled")}");
-            
-            // EXE 모드에서는 메시지로 전달
+
+            // EXE 모드에서만 메시지 전송
             if (OverlayAvailable)
             {
                 var msg = $"SET foregroundonly={(foregroundOnly ? "1" : "0")} color={GetCurrentColorOrDefault()} thickness={GetCurrentThicknessOrDefault()} corner={_lastCorner}";
@@ -979,23 +658,23 @@ public static class BorderService
                 if (hwnd != IntPtr.Zero)
                 {
                     TrySendCopyData(hwnd, msg);
-                    
-                    // 포그라운드 옵션 변경 후 충분한 시간을 두고 창 목록을 다시 전송
+
+                    // 포그라운드 옵션 변경 후 약간의 시간을 두고 창 목록을 다시 전송
                     System.Threading.Tasks.Task.Delay(200).ContinueWith(_ =>
                     {
                         try
                         {
-                            // 전체 창 목록을 다시 수집하여 전송 (필터링은 C++ 쪽에서 처리)
+                            // 전체 창 목록을 다시 전송하여 갱신 (필터링은 C++ 쪽에서 처리)
                             var allDetails = WindowTracker.GetCurrentWindowsDetailed();
                             var excludedSet = new HashSet<string>(_excluded.Select(x => Path.GetFileNameWithoutExtension(x) ?? string.Empty), StringComparer.OrdinalIgnoreCase);
                             var allWindows = allDetails.Where(t => t.Handle != IntPtr.Zero)
                                                       .Where(t => string.IsNullOrEmpty(t.ProcessName) || !excludedSet.Contains(t.ProcessName!))
                                                       .Select(t => t.Handle)
                                                       .ToArray();
-                        
+
                             TrySendHwndListToOverlay(allWindows);
                             LogMessage($"Sent complete window list ({allWindows.Length} windows) after foreground mode change");
-                            
+
                             // 추가 새로고침 요청 (두 번째 새로고침으로 확실히 반영)
                             System.Threading.Tasks.Task.Delay(100).ContinueWith(__ =>
                             {
@@ -1015,159 +694,6 @@ public static class BorderService
                     RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
                 }
             }
-            else if (_host != null && _running)
-            {
-                // DLL 모드에서는 강제 다시 그리기
-                try 
-                { 
-                    _host.ForceRedraw(); 
-                    LogMessage("Force redraw executed after foreground mode change (DLL)");
-                }
-                catch (Exception ex) 
-                { 
-                    LogMessage($"Failed to force redraw after foreground mode change (DLL): {ex.Message}"); 
-                }
-            }
         }
     }
-}
-
-/// <summary>C++ BorderServiceHost와의 상호운용을 위한 래퍼 클래스</summary>
-internal class BorderServiceCppHost : IDisposable
-{
-    private IntPtr _nativeHandle;
-    private bool _disposed;
-    private GCHandle _logCallbackHandle;
-    
-    public event Action<int, string>? LogReceived;
-
-    // 델리게이트를 internal로 변경하여 P/Invoke 메서드와 접근성을 맞춤
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    internal delegate void LogCallback(int level, [MarshalAs(UnmanagedType.LPWStr)] string message);
-
-    public BorderServiceCppHost(int argbColor, int thickness, bool debug)
-    {
-        try
-        {
-            // 로그 콜백 설정
-            LogCallback logCallback = OnLogCallback;
-            _logCallbackHandle = GCHandle.Alloc(logCallback);
-            
-            _nativeHandle = BS_CreateContext(argbColor, thickness, debug ? 1 : 0);
-            if (_nativeHandle == IntPtr.Zero)
-                throw new InvalidOperationException("Failed to create native BorderService context");
-                
-            BS_SetLogger(_nativeHandle, logCallback);
-            
-            // 기본 설정
-            BS_SetPartialRatio(_nativeHandle, 0.25f);
-            BS_EnableMerge(_nativeHandle, 1);
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
-    }
-
-    public void UpdateColor(int argbColor)
-    {
-        ThrowIfDisposed();
-        BS_UpdateColor(_nativeHandle, argbColor);
-    }
-
-    public void UpdateThickness(int thickness)
-    {
-        ThrowIfDisposed();
-        BS_UpdateThickness(_nativeHandle, thickness);
-    }
-
-    public void ForceRedraw()
-    {
-        ThrowIfDisposed();
-        BS_ForceRedraw(_nativeHandle);
-    }
-
-    public void SetPartialRatio(float ratio)
-    {
-        ThrowIfDisposed();
-        BS_SetPartialRatio(_nativeHandle, ratio);
-    }
-
-    public void EnableMerge(bool enable)
-    {
-        ThrowIfDisposed();
-        BS_EnableMerge(_nativeHandle, enable ? 1 : 0);
-    }
-
-    private void OnLogCallback(int level, string message)
-    {
-        LogReceived?.Invoke(level, message ?? string.Empty);
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-
-        try
-        {
-            if (_nativeHandle != IntPtr.Zero)
-            {
-                try
-                {
-                    // 네이티브 측 콜백 끊기(더 이상 호출 못 하게)
-                    BS_SetLogger(_nativeHandle, null);
-                }
-                catch { /* ignore */ }
-
-                // 컨텍스트 파괴
-                BS_DestroyContext(_nativeHandle);
-                _nativeHandle = IntPtr.Zero;
-            }
-        }
-        catch { }
-
-        try
-        {
-            if (_logCallbackHandle.IsAllocated)
-                _logCallbackHandle.Free(); // 콜백 핀 해제는 파괴 이후
-        }
-        catch { }
-
-        _disposed = true;
-    }
-
-    private void ThrowIfDisposed()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(BorderServiceCppHost));
-    }
-
-    #region P/Invoke Declarations
-    private const string DllName = "BorderServiceCpp.dll"; // .dll 확장자 명시
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern IntPtr BS_CreateContext(int argb, int thickness, int debug);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_DestroyContext(IntPtr ctx);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_UpdateColor(IntPtr ctx, int argb);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_UpdateThickness(IntPtr ctx, int thickness);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_ForceRedraw(IntPtr ctx);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_SetLogger(IntPtr ctx, LogCallback logger);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_SetPartialRatio(IntPtr ctx, float ratio);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-    internal static extern void BS_EnableMerge(IntPtr ctx, int enable);
-    #endregion
 }

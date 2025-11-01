@@ -4,6 +4,3 @@
 
 void ParseArgsAndApply();
 bool IsWindows11OrGreater();
-
-// Exposed parsed corner token: "default|donot|round|roundsmall"
-extern std::wstring g_cornerToken;

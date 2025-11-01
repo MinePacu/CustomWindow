@@ -157,12 +157,11 @@ namespace CustomWindow.Pages
             try
             {
                 // BorderService 상태 재확인
-                bool available = BorderService.IsDllAvailable();
                 bool running = BorderService.IsRunning;
                 
-                string statusMessage = available 
-                    ? (running ? "BorderService DLL 사용 가능하며 현재 실행 중" : "BorderService DLL 사용 가능하지만 실행 중이 아님")
-                    : "BorderService DLL을 찾을 수 없음";
+                string statusMessage = running 
+                    ? "BorderService EXE 실행 중" 
+                    : "BorderService가 실행 중이 아님";
                 
                 WindowTracker.AddExternalLog($"상태 확인: {statusMessage}");
                 
@@ -173,7 +172,7 @@ namespace CustomWindow.Pages
                 if (sender is Button button)
                 {
                     var originalContent = button.Content;
-                    button.Content = available ? "✓ 사용 가능" : "✗ 사용 불가";
+                    button.Content = running ? "✓ 실행 중" : "✗ 정지됨";
                     
                     // 2초 후 원래 상태로 복원
                     var timer = new DispatcherTimer();

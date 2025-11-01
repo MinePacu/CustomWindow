@@ -4,8 +4,9 @@
 RenderMode g_mode = RenderMode::Auto;
 bool g_console = false;
 D2D1_COLOR_F g_borderColor = D2D1::ColorF(0.0f, 0.8f, 1.0f, 1.0f);
-float g_thickness = 3.0f;
-bool g_foregroundWindowOnly = false; // 새로 추가: 포그라운드 창 전용 모드
+float g_thickness = 5.0f;
+bool g_foregroundWindowOnly = false;
+std::wstring g_cornerToken = L"default"; // 추가: 모서리 둥근 정도 기본값
 
 HWND g_overlay = nullptr;
 RECT g_virtualScreen{};

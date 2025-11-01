@@ -24,22 +24,6 @@ public partial class NormalSettingsViewModel : ObservableObject
             if (!set.Contains(d)) { _config.Snapshot.ExcludedPrograms.Add(d); added = true; }
         }
         if (added) OnPropertyChanged(nameof(ExcludedProgramList));
-        
-        // BorderService DLL 가용성 확인
-        CheckBorderServiceStatus();
-    }
-
-    private bool _borderServiceAvailable;
-    public bool BorderServiceAvailable
-    {
-        get => _borderServiceAvailable;
-        set
-        {
-            if (_borderServiceAvailable == value) return;
-            _borderServiceAvailable = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(BorderServiceStatusText));
-        }
     }
 
     // New: toggle to show the BorderService console
@@ -74,27 +58,24 @@ public partial class NormalSettingsViewModel : ObservableObject
                 BorderService.StopIfRunning();
                 BorderService.StartIfNeeded(borderHex, _config.BorderThickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 WindowTracker.AddExternalLog($"렌더 방식 변경 -> {_config.BorderRenderMode} (재시작)");
-                CheckBorderServiceStatus();
             }
         }
     }
 
-    //  상태 텍스트: EXE 모드 요약 + DLL 가용성
+    //  상태 텍스트: EXE 모드 요약
     public string BorderServiceStatusText
     {
         get
         {
             var exeSummary = BorderService.GetExeStatusSummary();
-            var dllSummary = BorderServiceAvailable ? "DLL 사용 가능" : "DLL 사용 불가";
-            return $"{exeSummary} | {dllSummary}";
+            return exeSummary;
         }
     }
 
     public void CheckBorderServiceStatus()
     {
-        BorderServiceAvailable = BorderService.IsDllAvailable();
         var exeSummary = BorderService.GetExeStatusSummary();
-        WindowTracker.AddExternalLog($"BorderService 상태 확인: {exeSummary}, DLL={(BorderServiceAvailable ? "사용 가능" : "사용 불가")}");
+        WindowTracker.AddExternalLog($"BorderService 상태 확인: {exeSummary}");
         OnPropertyChanged(nameof(BorderServiceStatusText));
     }
 
@@ -109,32 +90,29 @@ public partial class NormalSettingsViewModel : ObservableObject
             
             if (value)
             {
-                if (!BorderServiceAvailable)
-                {
-                    WindowTracker.AddExternalLog("안내: BorderService DLL이 없어도 EXE 모드로 동작합니다.");
-                }
-                
                 WindowTracker.Start();
+                
+                // WindowStyleApplier 초기화 (캡션 색상 모드 적용)
+                WindowStyleApplier.Initialize(_config);
+                
                 // BorderService 시작
                 var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 색상
                 int thickness = _config.BorderThickness;
                 BorderService.SetConsoleVisibilityPreference(_config.ShowBorderServiceConsole);
                 BorderService.SetRenderModePreference(_config.BorderRenderMode);
-                BorderService.SetForegroundWindowOnly(_config.ForegroundWindowOnly); // 새로운 옵션 적용
+                BorderService.SetForegroundWindowOnly(_config.ForegroundWindowOnly);
+                
+                // 창 모서리 설정 적용
+                BorderService.UpdateCornerMode(_config.WindowCornerMode);
+                
                 BorderService.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
                 
-                // (DLL 가용 시) 추가 설정
-                if (BorderServiceAvailable && BorderService.IsRunning)
-                {
-                    BorderService.SetPartialRatio(0.3f); // 30% 부분 렌더
-                    BorderService.EnableMerge(true);     // 머지 활성화
-                }
-                
-                WindowTracker.AddExternalLog("AutoWindowChange ON: BorderService 시작 요청");
+                WindowTracker.AddExternalLog($"AutoWindowChange ON: BorderService 시작 (Corner={_config.WindowCornerMode ?? "기본"})");
             }
             else
             {
                 BorderService.StopIfRunning();
+                WindowStyleApplier.Stop();
                 WindowTracker.Stop();
                 WindowTracker.AddExternalLog("AutoWindowChange OFF: BorderService 중지");
             }
