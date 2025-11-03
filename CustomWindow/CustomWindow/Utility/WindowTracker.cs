@@ -24,6 +24,22 @@ public static class WindowTracker
     // New: notify when window set changes (for EXE IPC)
     public static event Action<IReadOnlyCollection<nint>>? WindowSetChanged;
 
+    // 컨텍스트 메뉴 및 팝업 메뉴 클래스 이름 목록
+    private static readonly HashSet<string> _excludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "#32768",           // 표준 컨텍스트 메뉴
+        "Menu",             // 일반 메뉴
+        "MenuSite",         // 메뉴 사이트
+        "Internet Explorer_TridentCmboBx",  // IE 콤보박스
+        "ComboLBox",        // 콤보박스 리스트
+        "tooltips_class32", // 툴팁
+        "IME",              // IME 창
+        "MSCTFIME UI",      // IME UI
+        "Windows.UI.Core.CoreWindow", // UWP 팝업
+        "ToolbarWindow32",  // 툴바
+        "Button",           // 버튼 팝업
+    };
+
     private class TrackedWindow
     {
         public nint Handle { get; init; }
@@ -33,7 +49,7 @@ public static class WindowTracker
         public DateTime LastSeen { get; set; } = DateTime.UtcNow;
     }
 
-    /// <summary>현재 추적 중인 윈도우 핸들 목록.</summary>
+    /// <summary>현재 추적 중인 창 핸들 목록.</summary>
     public static IReadOnlyCollection<nint> CurrentWindowHandles => _windows.Keys.ToList();
 
     /// <summary>최근 로그 전체 반환 (최신순)</summary>
@@ -59,7 +75,7 @@ public static class WindowTracker
         }
     }
 
-    /// <summary>추적 중지 및 내부 캐시 클리어</summary>
+    /// <summary>추적 중지 및 캐시 클리어</summary>
     public static void Stop()
     {
         lock (_sync)
@@ -85,15 +101,27 @@ public static class WindowTracker
             var now = DateTime.UtcNow;
             var seen = new HashSet<nint>();
             int skippedInvisible = 0;
+            int skippedContextMenu = 0;
             int addedCount = 0;
+            
             EnumWindows((hwnd, lparam) =>
             {
                 if (!IsWindowVisible(hwnd)) { skippedInvisible++; return true; }
                 if (IsIconic(hwnd)) return true; // 최소화 창 제외
+                
+                // 컨텍스트 메뉴 및 팝업 메뉴 제외
+                if (IsContextMenuOrPopup(hwnd))
+                {
+                    skippedContextMenu++;
+                    return true;
+                }
+                
                 if (!HasNonEmptyTitle(hwnd)) return true; // 캡션 없는 창 제외
                 if (!HasUsableRect(hwnd)) return true; // zero / off-screen
+                
                 GetWindowThreadProcessId(hwnd, out var pid);
                 if (pid == 0) return true;
+                
                 var handle = (nint)hwnd;
                 bool added = false;
                 _windows.AddOrUpdate(handle,
@@ -124,7 +152,15 @@ public static class WindowTracker
                         removed++;
                 }
             }
-            AddLog($"Tick: Active={seen.Count} Added={addedCount} Removed={removed} SkipInvisible={skippedInvisible}");
+            
+            if (skippedContextMenu > 0)
+            {
+                AddLog($"Tick: Active={seen.Count} Added={addedCount} Removed={removed} SkipInvisible={skippedInvisible} SkipContextMenu={skippedContextMenu}");
+            }
+            else
+            {
+                AddLog($"Tick: Active={seen.Count} Added={addedCount} Removed={removed} SkipInvisible={skippedInvisible}");
+            }
 
             // Notify subscribers with the current set
             try { WindowSetChanged?.Invoke(seen.ToArray()); } catch { }
@@ -135,10 +171,62 @@ public static class WindowTracker
         }
     }
 
+    /// <summary>컨텍스트 메뉴 또는 팝업 창인지 확인</summary>
+    private static bool IsContextMenuOrPopup(nint hwnd)
+    {
+        try
+        {
+            var className = GetWindowClassName(hwnd);
+            if (string.IsNullOrEmpty(className))
+                return false;
+
+            // 제외할 클래스 이름 목록과 비교
+            if (_excludedWindowClasses.Contains(className))
+            {
+                return true;
+            }
+
+            // 추가 검사: WS_POPUP 스타일이면서 작은 크기의 창
+            var style = GetWindowLong(hwnd, GWL_STYLE);
+            bool isPopup = (style & WS_POPUP) != 0;
+            bool hasCaption = (style & WS_CAPTION) != 0;
+            
+            if (isPopup && !hasCaption)
+            {
+                // 팝업 스타일이지만 캡션이 없는 경우 크기로 판단
+                if (GetWindowRect(hwnd, out RECT rc))
+                {
+                    int width = rc.Right - rc.Left;
+                    int height = rc.Bottom - rc.Top;
+                    
+                    // 너무 작은 창은 컨텍스트 메뉴일 가능성이 높음
+                    if (width < 800 && height < 600 && !HasNonEmptyTitle(hwnd))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>창의 클래스 이름을 가져옵니다.</summary>
+    private static string? GetWindowClassName(nint hwnd)
+    {
+        var sb = new StringBuilder(256);
+        int len = GetClassName(hwnd, sb, sb.Capacity);
+        return len > 0 ? sb.ToString(0, len) : null;
+    }
+
     private static bool HasNonEmptyTitle(nint hwnd)
     {
         int len = GetWindowTextLength(hwnd);
-        if (len <= 0 || len > 512) return false; // 유한한 한도
+        if (len <= 0 || len > 512) return false; // 길이 제한
         var sb = new StringBuilder(len + 1);
         if (GetWindowText(hwnd, sb, sb.Capacity) <= 0) return false;
         return sb.ToString().Trim().Length > 0;
@@ -167,7 +255,7 @@ public static class WindowTracker
         try { return Process.GetProcessById((int)pid).ProcessName; } catch { return null; }
     }
 
-    /// <summary>외부 모듈(BorderService 등)에서 전달한 로그 라인을 추가하기 위한 래퍼.</summary>
+    /// <summary>외부 호출(BorderService 등)에서 로그를 로그 큐에 추가하기 위한 헬퍼.</summary>
     public static void AddExternalLog(string message) => AddLog(message);
 
     private static void AddLog(string message)
@@ -175,7 +263,7 @@ public static class WindowTracker
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
         _logs.Enqueue(line);
         while (_logs.Count > _logCapacity && _logs.TryDequeue(out _)) { }
-        // 안전 이벤트 발행: 개별 구독자 예외 격리
+        // 안전한 이벤트 발생: 구독자 예외가 전파 방지
         try
         {
             var handlers = LogAdded;
@@ -197,6 +285,11 @@ public static class WindowTracker
     #region Win32 P/Invoke
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    // Window Styles
+    private const int GWL_STYLE = -16;
+    private const uint WS_POPUP = 0x80000000;
+    private const uint WS_CAPTION = 0x00C00000;
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -224,6 +317,12 @@ public static class WindowTracker
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetWindowLong(nint hWnd, int nIndex);
 
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
     #endregion
