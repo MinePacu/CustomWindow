@@ -121,7 +121,7 @@ void ApplyDwmAttributesToTargets(const std::vector<HWND>& targets)
         
         // 새로운 적용 대상에 포함되지 않은 창들을 기본값으로 복원
         if (newTargets.find(it->first) == newTargets.end()) {
-            COLORREF defaultColor = RGB(0, 0, 0); // 기본 색상 (투명)
+            COLORREF defaultColor = DWMWA_COLOR_DEFAULT; // 기본 색상 (시스템 기본값)
             int defaultThick = 1; // 기본 두께
             DwmSetWindowAttribute(it->first, DWMWA_BORDER_COLOR, &defaultColor, sizeof(defaultColor));
             DwmSetWindowAttribute(it->first, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS, &defaultThick, sizeof(defaultThick));
@@ -152,10 +152,11 @@ void ResetAndApplyDwmAttributes()
 {
     if (g_mode != RenderMode::Dwm) return;
     
-    DebugLog(L"[DWM] Resetting all DWM attributes due to foreground mode change");
+    DebugLog(L"[DWM] Resetting all DWM attributes due to foreground mode change (foregroundOnly=" + 
+             std::to_wstring(g_foregroundWindowOnly) + L")");
     
     // 모든 이전 적용을 기본값으로 복원
-    COLORREF defaultColor = RGB(0, 0, 0);
+    COLORREF defaultColor = DWMWA_COLOR_DEFAULT;
     int defaultThick = 1;
     
     for (auto it = g_applied.begin(); it != g_applied.end(); ++it) {
@@ -169,9 +170,14 @@ void ResetAndApplyDwmAttributes()
     // 적용 맵 완전 초기화
     g_applied.clear();
     
-    // 새로운 설정으로 적용
+    // 새로운 설정으로 적용 (포그라운드 모드 여부에 따라 자동 필터링됨)
     auto hwnds = CollectUserVisibleWindows();
     ApplyDwmAttributesToTargets(hwnds);
+    
+    // 모서리 설정도 다시 적용
+    for (HWND h : hwnds) {
+        ApplyCornerPreference(h, g_cornerToken);
+    }
     
     DebugLog(L"[DWM] Reset complete, applied to " + std::to_wstring(hwnds.size()) + L" windows");
 }

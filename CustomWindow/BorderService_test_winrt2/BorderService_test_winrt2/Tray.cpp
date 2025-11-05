@@ -139,18 +139,22 @@ static void HandleSettingsMessage(const std::wstring& msg)
         if (g_mode == RenderMode::Dwm) {
             // DWM 모드에서는 전체 상태를 재설정
             ResetAndApplyDwmAttributes();
-            
-            // 모서리 설정도 다시 적용
-            auto hwnds = CollectUserVisibleWindows();
-            for (HWND h : hwnds) {
-                ApplyCornerPreference(h, g_cornerToken);
-            }
-            DebugLog(L"[Overlay] Reset and reapplied all DWM attributes due to foreground mode change");
+            DebugLog(L"[Overlay] Reset and reapplied all DWM attributes (including corners) due to foreground mode change");
         } else if (g_mode == RenderMode::DComp) {
-            // DComp 모드에서는 단순 새로고침 트리거
+            // DComp 모드에서는 오버레이 새로고침
             if (g_overlay) {
                 PostMessageW(g_overlay, WM_APP_REFRESH, 0, 0);
                 DebugLog(L"[Overlay] Triggered DComp refresh due to foreground mode change");
+            }
+            
+            // Windows 11에서는 실제 창 모서리도 다시 적용
+            if (IsWindows11OrGreater()) {
+                auto hwnds = CollectUserVisibleWindows();
+                for (HWND h : hwnds) {
+                    ApplyCornerPreference(h, g_cornerToken);
+                }
+                DebugLog(L"[Overlay] Reapplied corner preferences to " + std::to_wstring(hwnds.size()) + 
+                         L" windows after foreground mode change (DComp+Win11)");
             }
         }
     }
