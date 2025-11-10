@@ -519,5 +519,158 @@ namespace CustomWindow.Pages
                 WindowTracker.AddExternalLog($"상태 확인 실패: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// 렌더 모드 ComboBox 선택 변경 이벤트
+        /// </summary>
+        private void RenderModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (RenderModeComboBox == null) return;
+                
+                var selectedMode = RenderModeComboBox.SelectedItem as string;
+                WindowTracker.AddExternalLog($"[NormalSetting] Render mode changed to: {selectedMode}");
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"[NormalSetting] RenderModeComboBox_SelectionChanged error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 빠른 데모 로그 생성
+        /// </summary>
+        private void QuickDemoLogs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var colorViewModel = new ColorSettingsViewModel(App.ConfigStore!.Config);
+                colorViewModel.GenerateQuickDemoLogs();
+                
+                // 사용자 피드백
+                if (sender is Button button)
+                {
+                    var originalContent = button.Content;
+                    button.Content = "✓ 생성됨!";
+                    
+                    var timer = new DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(2);
+                    timer.Tick += (_, _) =>
+                    {
+                        button.Content = originalContent;
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"[NormalSetting] Quick demo logs error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 전체 데모 로그 생성
+        /// </summary>
+        private void FullDemoLogs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var colorViewModel = new ColorSettingsViewModel(App.ConfigStore!.Config);
+                colorViewModel.GenerateDemoLogs();
+                
+                // 사용자 피드백
+                if (sender is Button button)
+                {
+                    button.IsEnabled = false;
+                    var originalContent = button.Content;
+                    
+                    if (button.Content is StackPanel panel && panel.Children.Count > 1 && panel.Children[1] is TextBlock textBlock)
+                    {
+                        textBlock.Text = "생성 중...";
+                    }
+                    
+                    // 데모가 완료될 때까지 대기 후 버튼 복원 (약 8초)
+                    var timer = new DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(8);
+                    timer.Tick += (_, _) =>
+                    {
+                        button.Content = originalContent;
+                        button.IsEnabled = true;
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"[NormalSetting] Full demo logs error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 오류 시나리오 데모 로그 생성
+        /// </summary>
+        private void ErrorDemoLogs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var colorViewModel = new ColorSettingsViewModel(App.ConfigStore!.Config);
+                colorViewModel.GenerateErrorDemoLogs();
+                
+                // 사용자 피드백
+                if (sender is Button button)
+                {
+                    button.IsEnabled = false;
+                    
+                    // 3초 후 버튼 복원
+                    var timer = new DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(3);
+                    timer.Tick += (_, _) =>
+                    {
+                        button.IsEnabled = true;
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"[NormalSetting] Error demo logs error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 실시간 모니터링 데모 로그 생성
+        /// </summary>
+        private void MonitoringDemoLogs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var colorViewModel = new ColorSettingsViewModel(App.ConfigStore!.Config);
+                colorViewModel.GenerateMonitoringDemoLogs();
+                
+                // 사용자 피드백
+                if (sender is Button button)
+                {
+                    button.IsEnabled = false;
+                    
+                    // 10초 후 버튼 복원
+                    var timer = new DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(10);
+                    timer.Tick += (_, _) =>
+                    {
+                        button.IsEnabled = true;
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                WindowTracker.AddExternalLog($"[NormalSetting] Monitoring demo logs error: {ex.Message}");
+            }
+        }
     }
 }

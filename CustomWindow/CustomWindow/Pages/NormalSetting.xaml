@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="CustomWindow.Pages.NormalSetting"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -178,18 +177,21 @@
                         <!-- 렌더 방식 -->
                         <controls:SettingsCard
                             Header="렌더 방식"
-                            Description="테두리 렌더링 방법 선택 (Auto 권장)">
+                            Description="테두리 렌더링 방법 선택">
                             <controls:SettingsCard.HeaderIcon>
-                                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE950;"/>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9A2;"/>
                             </controls:SettingsCard.HeaderIcon>
-                            <ComboBox SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}" MinWidth="120">
+                            <ComboBox x:Name="RenderModeComboBox"
+                                     SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}" 
+                                     MinWidth="120"
+                                     SelectionChanged="RenderModeComboBox_SelectionChanged">
                                 <x:String>Auto</x:String>
                                 <x:String>Dwm</x:String>
                                 <x:String>DComp</x:String>
                             </ComboBox>
                         </controls:SettingsCard>
-
-                        <!-- 콘솔 표시 -->
+                        
+                        <!-- 디버그 콘솔 표시 -->
                         <controls:SettingsCard
                             Header="디버그 콘솔 표시"
                             Description="개발용: 콘솔 창 표시 (재시작 필요)">
@@ -200,6 +202,121 @@
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>
+                
+                <!-- 렌더 모드 도움말 (별도 카드로 분리) -->
+                <controls:SettingsCard
+                    Header="렌더 모드 정보"
+                    Description="각 렌더 모드의 특징과 사용 시기"
+                    ContentAlignment="Vertical"
+                    HorizontalContentAlignment="Stretch"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    
+                    <Expander Header="📖 렌더 모드 설명 보기" 
+                             HorizontalAlignment="Stretch"
+                             Margin="0,8,0,0">
+                        <StackPanel Spacing="12" Margin="0,8,0,0">
+                            <!-- Auto 모드 -->
+                            <Border x:Name="AutoModeInfoHelp"
+                                   Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                   BorderBrush="{ThemeResource SystemFillColorSuccessBrush}"
+                                   BorderThickness="2"
+                                   CornerRadius="8"
+                                   Padding="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="✓ Auto (자동) - 권장" 
+                                              FontWeight="SemiBold"
+                                              Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                    <TextBlock TextWrapping="Wrap"
+                                              FontSize="12"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        Windows 버전에 따라 최적의 렌더링 방식을 자동으로 선택합니다.
+                                        <LineBreak/>
+                                        • Windows 11: DWM 모드
+                                        <LineBreak/>
+                                        • Windows 10: DComp 모드
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                            
+                            <!-- DWM 모드 -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                   BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                   BorderThickness="2"
+                                   CornerRadius="8"
+                                   Padding="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="⚡ DWM (Desktop Window Manager)" 
+                                              FontWeight="SemiBold"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <TextBlock TextWrapping="Wrap"
+                                              FontSize="12"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        Windows의 네이티브 DWM API를 사용하여 창 테두리를 직접 조작합니다.
+                                    </TextBlock>
+                                    
+                                    <TextBlock Text="장점:" FontWeight="SemiBold" FontSize="11" Margin="0,4,0,0"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        ✓ 최고의 성능 (CPU/GPU 사용량 최소)
+                                        <LineBreak/>
+                                        ✓ Windows 11에서 완벽하게 통합
+                                        <LineBreak/>
+                                        ✓ 깜빡임 없는 부드러운 렌더링
+                                    </TextBlock>
+                                    
+                                    <TextBlock Text="단점:" FontWeight="SemiBold" FontSize="11" Margin="0,4,0,0"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        ✗ Windows 11에서만 완전히 지원
+                                        <LineBreak/>
+                                        ✗ 테두리 두께 제한 (시스템 제약)
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                            
+                            <!-- DComp 모드 -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                   BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                   BorderThickness="2"
+                                   CornerRadius="8"
+                                   Padding="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="🎨 DComp (DirectComposition)" 
+                                              FontWeight="SemiBold"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <TextBlock TextWrapping="Wrap"
+                                              FontSize="12"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        DirectComposition과 Direct2D를 사용하여 오버레이 창으로 테두리를 그립니다.
+                                    </TextBlock>
+                                    
+                                    <TextBlock Text="장점:" FontWeight="SemiBold" FontSize="11" Margin="0,4,0,0"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        ✓ Windows 10/11 모두 지원
+                                        <LineBreak/>
+                                        ✓ 자유로운 테두리 두께 조정
+                                        <LineBreak/>
+                                        ✓ 고급 그래픽 효과 가능
+                                    </TextBlock>
+                                    
+                                    <TextBlock Text="단점:" FontWeight="SemiBold" FontSize="11" Margin="0,4,0,0"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        ✗ DWM보다 약간 높은 리소스 사용
+                                        <LineBreak/>
+                                        ✗ 드물게 오버레이 깜빡임 발생 가능
+                                        <LineBreak/>
+                                        ✗ 일부 전체화면 앱과 충돌 가능성
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Expander>
+                </controls:SettingsCard>
 
                 <!-- ========================================
                      3. 윈도우 외관 설정 그룹 (미리보기 추가)
@@ -518,6 +635,116 @@
                                     </Button>
                                 </StackPanel>
                             </Grid>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- 데모 로그 생성 도구 -->
+                <controls:SettingsExpander
+                    Header="데모 로그 생성기"
+                    Description="시연용 샘플 로그를 자동으로 생성합니다"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <Button Content="빠른 데모" Click="QuickDemoLogs_Click"/>
+                    
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            Header="데모 시나리오"
+                            Description="다양한 시스템 동작을 시뮬레이션합니다"
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <Grid Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- 데모 버튼들 -->
+                                <StackPanel Grid.Row="0" Spacing="8">
+                                    <Button Click="FullDemoLogs_Click" 
+                                           HorizontalAlignment="Stretch"
+                                           Style="{StaticResource AccentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" FontSize="16"/>
+                                            <TextBlock Text="전체 데모 시연" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                    </Button>
+                                    
+                                    <Button Click="ErrorDemoLogs_Click" 
+                                           HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE783;" FontSize="16"/>
+                                            <TextBlock Text="오류 시나리오 데모"/>
+                                        </StackPanel>
+                                    </Button>
+                                    
+                                    <Button Click="MonitoringDemoLogs_Click" 
+                                           HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="16"/>
+                                            <TextBlock Text="실시간 모니터링 데모"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                
+                                <!-- 설명 -->
+                                <InfoBar Grid.Row="1"
+                                        Severity="Informational"
+                                        IsOpen="True"
+                                        IsClosable="False"
+                                        Title="데모 로그 정보"
+                                        Message="데모 로그는 실제 시스템 동작을 시뮬레이션한 샘플 로그입니다. 프레젠테이션이나 테스트 목적으로 사용하세요."
+                                        Margin="0,12,0,0"/>
+                            </Grid>
+                        </controls:SettingsCard>
+                        
+                        <controls:SettingsCard
+                            Header="데모 시나리오 설명">
+                            <Expander Header="📖 각 데모의 내용 보기" 
+                                     HorizontalAlignment="Stretch">
+                                <StackPanel Spacing="12" Margin="0,8,0,0">
+                                    <TextBlock TextWrapping="Wrap">
+                                        <Run Text="🎬 전체 데모 시연" FontWeight="SemiBold"/>
+                                        <LineBreak/>
+                                        <Run Text="서비스 시작부터 종료까지의 전체 프로세스를 보여줍니다."/>
+                                        <LineBreak/>
+                                        <Run Text="• 서비스 초기화"/>
+                                        <LineBreak/>
+                                        <Run Text="• 창 감지 및 추적"/>
+                                        <LineBreak/>
+                                        <Run Text="• 테두리 적용"/>
+                                        <LineBreak/>
+                                        <Run Text="• 설정 변경"/>
+                                        <LineBreak/>
+                                        <Run Text="• 통계 정보"/>
+                                        <LineBreak/>
+                                        <LineBreak/>
+                                        <Run Text="⚠️ 오류 시나리오 데모" FontWeight="SemiBold"/>
+                                        <LineBreak/>
+                                        <Run Text="오류 발생 및 복구 과정을 시뮬레이션합니다."/>
+                                        <LineBreak/>
+                                        <Run Text="• DWM 초기화 실패"/>
+                                        <LineBreak/>
+                                        <Run Text="• DComp로 자동 폴백"/>
+                                        <LineBreak/>
+                                        <Run Text="• 복구 성공"/>
+                                        <LineBreak/>
+                                        <LineBreak/>
+                                        <Run Text="📊 실시간 모니터링 데모" FontWeight="SemiBold"/>
+                                        <LineBreak/>
+                                        <Run Text="시스템 리소스 사용량을 실시간으로 모니터링하는 과정을 보여줍니다."/>
+                                        <LineBreak/>
+                                        <Run Text="• CPU/메모리 사용률"/>
+                                        <LineBreak/>
+                                        <Run Text="• 창 개수 변화"/>
+                                        <LineBreak/>
+                                        <Run Text="• 동적 이벤트 감지"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Expander>
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>

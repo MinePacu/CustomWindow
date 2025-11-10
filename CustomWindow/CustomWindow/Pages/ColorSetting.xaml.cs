@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+ï»¿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using CustomWindow.Utility;
@@ -14,7 +14,7 @@ namespace CustomWindow.Pages
     {
         public ColorSettingsViewModel ViewModel { get; }
         
-        // Windows 11 Áö¿ø ¿©ºÎ
+        // Windows 11 ì§€ì› ì—¬ë¶€
         public bool IsWindows11OrGreater { get; }
         public bool IsWindows10 => !IsWindows11OrGreater;
         
@@ -22,7 +22,7 @@ namespace CustomWindow.Pages
         {
             InitializeComponent();
             
-            // Windows ¹öÀü È®ÀÎ
+            // Windows ë²„ì „ í™•ì¸
             IsWindows11OrGreater = CheckWindows11();
             
             ViewModel = new ColorSettingsViewModel(App.ConfigStore!.Config);
@@ -33,7 +33,7 @@ namespace CustomWindow.Pages
 
         private void ColorSetting_Loaded(object sender, RoutedEventArgs e)
         {
-            // Windows 10¿¡¼­ Ä¿½ºÅÒ Ä¸¼Ç »ö»ó ±â´É ºñÈ°¼ºÈ­
+            // Windows 10ì—ì„œ ì»¤ìŠ¤í…€ ìº¡ì…˜ ìƒ‰ìƒ ê¸°ëŠ¥ ë¹„í™œì„±í™”
             if (IsWindows10)
             {
                 ShowWindows10Warning();
@@ -46,7 +46,7 @@ namespace CustomWindow.Pages
             try
             {
                 var version = Environment.OSVersion.Version;
-                // Windows 11Àº ºôµå 22000 ÀÌ»ó
+                // Windows 11ì€ ë¹Œë“œ 22000 ì´ìƒ
                 bool isWin11 = version.Major >= 10 && version.Build >= 22000;
                 
                 WindowTracker.AddExternalLog($"[ColorSetting] OS Version: {version.Major}.{version.Build} - Windows {(isWin11 ? "11+" : "10")}");
@@ -64,11 +64,11 @@ namespace CustomWindow.Pages
         {
             WindowTracker.AddExternalLog("[ColorSetting] Windows 10 detected - Custom caption colors disabled");
             
-            // InfoBar¸¦ µ¿ÀûÀ¸·Î Ãß°¡ÇÏ¿© »ç¿ëÀÚ¿¡°Ô ¾Ë¸²
+            // InfoBarë¥¼ ë™ì ìœ¼ë¡œ ì¶”ê°€í•˜ì—¬ ì‚¬ìš©ìì—ê²Œ ì•Œë¦¼
             var infoBar = new InfoBar
             {
-                Title = "Windows 10 Á¦ÇÑ»çÇ×",
-                Message = "Ä¿½ºÅÒ Á¦¸ñ Ç¥½ÃÁÙ »ö»ó ¹× ÅØ½ºÆ® »ö»óÀº Windows 11 ÀÌ»ó¿¡¼­¸¸ Áö¿øµË´Ï´Ù. Windows 10¿¡¼­´Â '¹à°Ô'/'¾îµÓ°Ô' ¸ğµå¸¸ »ç¿ëÇÒ ¼ö ÀÖ½À´Ï´Ù.",
+                Title = "Windows 10 ì œí•œì‚¬í•­",
+                Message = "ì»¤ìŠ¤í…€ ì œëª© í‘œì‹œì¤„ ìƒ‰ìƒ ë° í…ìŠ¤íŠ¸ ìƒ‰ìƒì€ Windows 11 ì´ìƒì—ì„œë§Œ ì§€ì›ë©ë‹ˆë‹¤. Windows 10ì—ì„œëŠ” 'ë°ê²Œ'/'ì–´ë‘¡ê²Œ' ëª¨ë“œë§Œ ì‚¬ìš©í•  ìˆ˜ ìˆìŠµë‹ˆë‹¤.",
                 Severity = InfoBarSeverity.Warning,
                 IsOpen = true,
                 IsClosable = true,
@@ -82,24 +82,24 @@ namespace CustomWindow.Pages
         {
             try
             {
-                // 1. Ä¸¼Ç »ö»ó Expander ºñÈ°¼ºÈ­
+                // 1. ìº¡ì…˜ ìƒ‰ìƒ Expander ë¹„í™œì„±í™”
                 if (CaptionColorExpander != null)
                 {
                     CaptionColorExpander.IsEnabled = false;
-                    CaptionColorExpander.Description = "Windows 11+ Àü¿ë - Windows 10¿¡¼­´Â Áö¿øµÇÁö ¾Ê½À´Ï´Ù";
+                    CaptionColorExpander.Description = "Windows 11+ ì „ìš© - Windows 10ì—ì„œëŠ” ì§€ì›ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤";
                 }
 
-                // 2. Ä¸¼Ç ÅØ½ºÆ® »ö»ó Expander ºñÈ°¼ºÈ­
+                // 2. ìº¡ì…˜ í…ìŠ¤íŠ¸ ìƒ‰ìƒ Expander ë¹„í™œì„±í™”
                 if (CaptionTextColorExpander != null)
                 {
                     CaptionTextColorExpander.IsEnabled = false;
-                    CaptionTextColorExpander.Description = "Windows 11+ Àü¿ë - Windows 10¿¡¼­´Â Áö¿øµÇÁö ¾Ê½À´Ï´Ù";
+                    CaptionTextColorExpander.Description = "Windows 11+ ì „ìš© - Windows 10ì—ì„œëŠ” ì§€ì›ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤";
                 }
 
-                // 3. ComboBox¿¡¼­ "Ä¿½ºÅÒ" Ç×¸ñ Á¦°Å
+                // 3. ComboBoxì—ì„œ "ì»¤ìŠ¤í…€" í•­ëª© ì œê±°
                 if (CaptionModeComboBox != null && CaptionModeComboBox.Items.Count > 2)
                 {
-                    var customItem = CaptionModeComboBox.Items.OfType<string>().FirstOrDefault(s => s == "Ä¿½ºÅÒ");
+                    var customItem = CaptionModeComboBox.Items.OfType<string>().FirstOrDefault(s => s == "ì»¤ìŠ¤í…€");
                     if (customItem != null)
                     {
                         CaptionModeComboBox.Items.Remove(customItem);
@@ -107,10 +107,10 @@ namespace CustomWindow.Pages
                     }
                 }
 
-                // 4. ViewModel¿¡¼­ Custom ¸ğµå »ç¿ë ÁßÀÌ¸é Dark·Î ÀüÈ¯
-                if (ViewModel.CaptionColorMode == "Ä¿½ºÅÒ")
+                // 4. ViewModelì—ì„œ Custom ëª¨ë“œ ì‚¬ìš© ì¤‘ì´ë©´ Darkë¡œ ì „í™˜
+                if (ViewModel.CaptionColorMode == "ì»¤ìŠ¤í…€")
                 {
-                    ViewModel.CaptionColorMode = "¾îµÓ°Ô";
+                    ViewModel.CaptionColorMode = "ì–´ë‘¡ê²Œ";
                     WindowTracker.AddExternalLog("[ColorSetting] Changed from Custom to Dark mode for Windows 10 compatibility");
                 }
 
@@ -123,7 +123,7 @@ namespace CustomWindow.Pages
         }
 
         /// <summary>
-        /// ÇÁ¸®¼Â »ö»ó ¹öÆ° Å¬¸¯ ÀÌº¥Æ® ÇÚµé·¯
+        /// í”„ë¦¬ì…‹ ìƒ‰ìƒ ë²„íŠ¼ í´ë¦­ ì´ë²¤íŠ¸ í•¸ë“¤ëŸ¬
         /// </summary>
         private void PresetColor_Click(object sender, RoutedEventArgs e)
         {
@@ -131,7 +131,7 @@ namespace CustomWindow.Pages
             {
                 if (sender is Button button && button.Tag is string hexColor)
                 {
-                    // HEX ¹®ÀÚ¿­À» Color·Î º¯È¯
+                    // HEX ë¬¸ìì—´ì„ Colorë¡œ ë³€í™˜
                     var color = ParseHexColor(hexColor);
                     if (color.HasValue)
                     {
@@ -147,7 +147,7 @@ namespace CustomWindow.Pages
         }
 
         /// <summary>
-        /// HEX »ö»ó º¹»ç ¹öÆ° Å¬¸¯ ÀÌº¥Æ® ÇÚµé·¯
+        /// HEX ìƒ‰ìƒ ë³µì‚¬ ë²„íŠ¼ í´ë¦­ ì´ë²¤íŠ¸ í•¸ë“¤ëŸ¬
         /// </summary>
         private void CopyBorderHexColor_Click(object sender, RoutedEventArgs e)
         {
@@ -162,13 +162,13 @@ namespace CustomWindow.Pages
                     
                     WindowTracker.AddExternalLog($"[ColorSetting] Copied to clipboard: {hexValue}");
                     
-                    // »ç¿ëÀÚ¿¡°Ô º¹»ç ¿Ï·á ¾Ë¸² (°£´ÜÇÑ ToolTip º¯°æ)
+                    // ì‚¬ìš©ìì—ê²Œ ë³µì‚¬ ì™„ë£Œ ì•Œë¦¼ (ê°„ë‹¨í•œ ToolTip ë³€ê²½)
                     if (sender is Button btn)
                     {
                         var originalContent = btn.Content;
-                        btn.Content = "? º¹»çµÊ!";
+                        btn.Content = "âœ“ ë³µì‚¬ë¨!";
                         
-                        // 2ÃÊ ÈÄ ¿ø·¡ ÅØ½ºÆ®·Î º¹¿ø
+                        // 2ì´ˆ í›„ ì›ë˜ í…ìŠ¤íŠ¸ë¡œ ë³µì›
                         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
                         timer.Tick += (s, args) =>
                         {
@@ -186,7 +186,7 @@ namespace CustomWindow.Pages
         }
 
         /// <summary>
-        /// HEX ¹®ÀÚ¿­À» Color·Î º¯È¯
+        /// HEX ë¬¸ìì—´ì„ Colorë¡œ ë³€í™˜
         /// </summary>
         private Color? ParseHexColor(string hex)
         {
@@ -196,7 +196,7 @@ namespace CustomWindow.Pages
                 
                 if (hex.Length == 6)
                 {
-                    // RGB Çü½Ä
+                    // RGB í˜•ì‹
                     byte r = Convert.ToByte(hex.Substring(0, 2), 16);
                     byte g = Convert.ToByte(hex.Substring(2, 2), 16);
                     byte b = Convert.ToByte(hex.Substring(4, 2), 16);
@@ -204,7 +204,7 @@ namespace CustomWindow.Pages
                 }
                 else if (hex.Length == 8)
                 {
-                    // ARGB Çü½Ä
+                    // ARGB í˜•ì‹
                     byte a = Convert.ToByte(hex.Substring(0, 2), 16);
                     byte r = Convert.ToByte(hex.Substring(2, 2), 16);
                     byte g = Convert.ToByte(hex.Substring(4, 2), 16);
@@ -268,7 +268,7 @@ namespace CustomWindow.Pages
             }
         }
 
-        // µ¥¸ğ Åä±Û ¸Ş¼­µå (±âÁ¸ ColorSetting.xaml.cs¿¡¼­ À¯Áö)
+        // ë°ëª¨ í† ê¸€ ë©”ì„œë“œ (ê¸°ì¡´ ColorSetting.xaml.csì—ì„œ ìœ ì§€)
         private void borderColorbutton_Click(object sender, RoutedEventArgs e) => ViewModel.ToggleBorderDemo();
         private void captIonColorbutton_Click(object sender, RoutedEventArgs e) => ViewModel.ToggleCaptionDemo();
         private void captIonTextColorbutton_Click(object sender, RoutedEventArgs e) => ViewModel.ToggleCaptionTextDemo();
