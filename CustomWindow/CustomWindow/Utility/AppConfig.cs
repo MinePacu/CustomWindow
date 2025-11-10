@@ -45,4 +45,7 @@ public sealed class AppConfig
 
     // Border render method: "Auto", "Dwm", or "DComp"
     public string BorderRenderMode { get; set; } = "Auto";
+    
+    // Enable/Disable window tracker logging
+    public bool EnableWindowTrackerLog { get; set; } = true;
 }

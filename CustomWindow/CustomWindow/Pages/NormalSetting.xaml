@@ -9,226 +9,520 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     mc:Ignorable="d">
 
-    <Grid
-        HorizontalAlignment="Stretch"
-        MaxWidth="990">
+    <Grid HorizontalAlignment="Stretch" MaxWidth="990">
         <ScrollViewer
             HorizontalAlignment="Stretch"
             IsDeferredScrollingEnabled="True"
             VerticalScrollBarVisibility="Visible"
             MaxWidth="990"
             Margin="0, 20, 0, 20">
-            <StackPanel 
-                 x:Name="Panel"
-                 HorizontalAlignment="Stretch">
+            <StackPanel x:Name="Panel" HorizontalAlignment="Stretch" Spacing="4">
 
-                <controls:SettingsCard
-                    Header="윈도우 설정 자동 변경"
-                    Description="윈도우 설정을 자동으로 변경합니다."
-                    Margin="0, 0, 0, 3">
-                    <controls:SettingsCard.HeaderIcon>
-                        <FontIcon 
-                            FontFamily="Segoe Fluent Icons" 
-                            Glyph="&#xe943;"/>
-                    </controls:SettingsCard.HeaderIcon>
-                    <ToggleSwitch 
-                        IsOn="{x:Bind ViewModel.AutoWindowChange, Mode=TwoWay}"/>
-                </controls:SettingsCard>
-
-                <!-- 새로 추가: 포그라운드 창 전용 옵션 -->
-                <controls:SettingsCard
-                    Header="포그라운드 창에서만 테두리 표시"
-                    Description="활성 창(포그라운드)에서만 테두리를 표시합니다. AutoChangeWindow가 활성화된 상태에서만 동작합니다."
-                    Margin="0, 0, 0, 3"
-                    IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}">
-                    <controls:SettingsCard.HeaderIcon>
-                        <FontIcon 
-                            FontFamily="Segoe Fluent Icons" 
-                            Glyph="&#xE8A7;"/>
-                    </controls:SettingsCard.HeaderIcon>
-                    <ToggleSwitch 
-                        IsOn="{x:Bind ViewModel.ForegroundWindowOnly, Mode=TwoWay}"
-                        IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
-                </controls:SettingsCard>
-
-                <!-- BorderService 상태 표시 -->
-                <controls:SettingsCard
-                    Header="테두리 서비스 상태"
-                    Description="{x:Bind ViewModel.BorderServiceStatusText, Mode=OneWay}"
-                    Margin="0, 0, 0, 3">
-                    <controls:SettingsCard.HeaderIcon>
-                        <FontIcon 
-                            FontFamily="Segoe Fluent Icons" 
-                            Glyph="&#xE9D5;"/>
-                    </controls:SettingsCard.HeaderIcon>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button 
-                            Content="다시 그리기" 
-                            Click="ForceRedrawBorders_Click"
-                            IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
-                        <Button 
-                            Content="상태 확인" 
-                            Click="CheckBorderServiceStatus_Click"/>
-                    </StackPanel>
-                </controls:SettingsCard>
-
-                <!-- New: BorderService 콘솔 표시 설정 -->
-                <controls:SettingsCard
-                    Header="BorderService 콘솔 표시"
-                    Description="CustomWindow에서 실행할 때 콘솔 창을 표시합니다. (재시작 필요)"
-                    Margin="0,0,0,3">
-                    <controls:SettingsCard.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F4;"/>
-                    </controls:SettingsCard.HeaderIcon>
-                    <ToggleSwitch
-                        IsOn="{x:Bind ViewModel.ShowBorderServiceConsole, Mode=TwoWay}"/>
-                </controls:SettingsCard>
-
-                <!-- New: Render method selection for debugging -->
-                <controls:SettingsCard
-                    Header="테두리 렌더 방식"
-                    Description="개발용: 운영체제 버전 무시하고 DWM/DComp 중 선택"
-                    Margin="0,0,0,3">
-                    <controls:SettingsCard.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9A2;"/>
-                    </controls:SettingsCard.HeaderIcon>
-                    <ComboBox SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}">
-                        <x:String>Auto</x:String>
-                        <x:String>Dwm</x:String>
-                        <x:String>DComp</x:String>
-                    </ComboBox>
-                </controls:SettingsCard>
+                <!-- ========================================
+                     1. 자동 변경 설정 그룹
+                     ======================================== -->
+                <TextBlock 
+                    Text="자동 변경 설정" 
+                    Margin="0,0,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
                 <controls:SettingsExpander
-                    Header="제외 프로그램"
-                    Description="제외할 프로그램 목록"
-                    x:Name="NonProgram_Expander"
-                    Margin="0, 0, 0, 3"
-                    ToolTipService.ToolTip="색상을 적용하지 않을 프로그램을 설정합니다.&#10;&#10;각 프로그램에 대해서 어떤 기능을 제외할지를 수동으로 설정할 수 있습니다.&#10;/b - 모서리 색상을 적용하지 않습니다.&#10;/c - 캡션 색을 적용하지 않습니다.&#10;/t - 캡션 텍스트 색을 적용하지 않습니다.">
+                    Header="윈도우 설정 자동 변경"
+                    Description="윈도우 설정을 자동으로 변경합니다."
+                    Margin="0,0,0,3">
                     <controls:SettingsExpander.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xed35;"/>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xe943;"/>
                     </controls:SettingsExpander.HeaderIcon>
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.AutoWindowChange, Mode=TwoWay}"/>
+                    
                     <controls:SettingsExpander.Items>
+                        <!-- 포그라운드 창 전용 -->
                         <controls:SettingsCard
+                            Header="포그라운드 창에서만 테두리 표시"
+                            Description="활성 창(포그라운드)에서만 테두리를 표시합니다."
+                            IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A7;"/>
+                            </controls:SettingsCard.HeaderIcon>
+                            <ToggleSwitch 
+                                IsOn="{x:Bind ViewModel.ForegroundWindowOnly, Mode=TwoWay}"
+                                IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
+                        </controls:SettingsCard>
+
+                        <!-- 제외 프로그램 -->
+                        <controls:SettingsCard
+                            Header="제외 프로그램"
+                            Description="테두리를 적용하지 않을 프로그램 목록"
                             ContentAlignment="Vertical"
                             HorizontalContentAlignment="Stretch">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xed35;"/>
+                            </controls:SettingsCard.HeaderIcon>
                             <TextBox 
                                 TextWrapping="Wrap"
                                 AcceptsReturn="True" 
                                 Text="{x:Bind ViewModel.ExcludedProgramList, Mode=TwoWay}"
+                                PlaceholderText="프로그램 이름 입력 (한 줄에 하나씩)"
                                 HorizontalAlignment="Stretch"
-                                VerticalAlignment="Center"
-                                ScrollViewer.VerticalScrollMode="Auto"/>
+                                MinHeight="80"
+                                MaxHeight="120"
+                                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                Margin="0,8,0,0"/>
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>
 
-                <TextBlock Text="윈도우 설정" 
-                   Margin="0, 14, 0, 4" 
-                   FontSize="14" 
-                   FontWeight="Bold" />
+                <!-- ========================================
+                     2. 테두리 서비스 설정 그룹 (개선됨)
+                     ======================================== -->
+                <TextBlock 
+                    Text="테두리 서비스" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
-                <controls:SettingsCard 
-                    Header="창 모서리 설정">
-                    <ComboBox
-                        SelectedItem="{x:Bind ViewModel.WindowCornerMode, Mode=TwoWay}">
+                <!-- 실시간 통계 대시보드 -->
+                <controls:SettingsCard
+                    Header="📊 실시간 통계"
+                    Description="현재 테두리 서비스 동작 상태"
+                    ContentAlignment="Vertical"
+                    HorizontalContentAlignment="Stretch"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    
+                    <Grid Margin="0,12,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- 상태 표시 -->
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="서비스 상태" 
+                                          FontSize="11" 
+                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Ellipse x:Name="ServiceStatusIndicator"
+                                            Width="12" Height="12"
+                                            Fill="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                    <TextBlock x:Name="ServiceStatusText" 
+                                              Text="정지됨" 
+                                              FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="추적 중인 창" 
+                                          FontSize="11" 
+                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="TrackedWindowsText" 
+                                          Text="0개" 
+                                          FontWeight="SemiBold"
+                                          FontSize="15"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="테두리 적용됨" 
+                                          FontSize="11" 
+                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="BorderAppliedText" 
+                                          Text="0개" 
+                                          FontWeight="SemiBold"
+                                          FontSize="15"/>
+                            </StackPanel>
+                        </Grid>
+                        
+                        <!-- 프로그레스 바 -->
+                        <ProgressBar Grid.Row="1" 
+                                    x:Name="ServiceActivityProgress"
+                                    IsIndeterminate="False"
+                                    ShowError="False"
+                                    ShowPaused="False"
+                                    Height="4"
+                                    Margin="0,0,0,8"/>
+                    </Grid>
+                </controls:SettingsCard>
+
+                <controls:SettingsExpander
+                    Header="테두리 서비스 관리"
+                    Description="서비스 제어 및 설정"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D5;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button 
+                            x:Name="ForceRedrawButton"
+                            Content="🔄 다시 그리기" 
+                            Click="ForceRedrawBorders_Click"
+                            IsEnabled="{x:Bind ViewModel.AutoWindowChange, Mode=OneWay}"/>
+                        <Button 
+                            x:Name="CheckStatusButton"
+                            Content="🔍 상태 확인" 
+                            Click="CheckBorderServiceStatus_Click"/>
+                    </StackPanel>
+                    
+                    <controls:SettingsExpander.Items>
+                        <!-- 렌더 방식 -->
+                        <controls:SettingsCard
+                            Header="렌더 방식"
+                            Description="테두리 렌더링 방법 선택 (Auto 권장)">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9A2;"/>
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}" MinWidth="120">
+                                <x:String>Auto</x:String>
+                                <x:String>Dwm</x:String>
+                                <x:String>DComp</x:String>
+                            </ComboBox>
+                        </controls:SettingsCard>
+
+                        <!-- 콘솔 표시 -->
+                        <controls:SettingsCard
+                            Header="디버그 콘솔 표시"
+                            Description="개발용: 콘솔 창 표시 (재시작 필요)">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F4;"/>
+                            </controls:SettingsCard.HeaderIcon>
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowBorderServiceConsole, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- ========================================
+                     3. 윈도우 외관 설정 그룹 (미리보기 추가)
+                     ======================================== -->
+                <TextBlock 
+                    Text="윈도우 외관" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                <controls:SettingsExpander 
+                    Header="창 모서리 설정"
+                    Description="창 모서리 스타일 선택 (Windows 11+)"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE91F;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    <ComboBox SelectedItem="{x:Bind ViewModel.WindowCornerMode, Mode=TwoWay}" 
+                             MinWidth="150"
+                             SelectionChanged="CornerModeComboBox_SelectionChanged">
                         <x:String>기본</x:String>
                         <x:String>둥글게 하지 않음</x:String>
                         <x:String>둥글게</x:String>
                         <x:String>덜 둥글게</x:String>
                     </ComboBox>
-                </controls:SettingsCard>
-                <TextBlock
-                    Text="권한" 
-                    FontWeight="Bold"
-                    Margin="0, 0, 0, 7"/>
-                <controls:SettingsExpander
-                    Header="관리자 권한으로 실행"
-                    Margin="0, 0, 0, 3">
-                    <controls:SettingsExpander.HeaderIcon>
-                        <FontIcon 
-                             FontFamily="Segoe Fluent Icons"
-                            Glyph="&#xe713;"/>
-                    </controls:SettingsExpander.HeaderIcon>
-                    <Button 
-                        x:Name="RestartWithAdminbutton"
-                        Content="관리자 권한으로 다시 시작"
-                        Click="RestartWithAdminbutton_Click"/>
+                    
                     <controls:SettingsExpander.Items>
                         <controls:SettingsCard
-                            Header="자동으로 관리자 권한으로 시작"
-                            Description="프로그램을 열면 자동으로 관리자 권한을 부여합니다.">
-                            <ToggleSwitch
-                                x:Name="AutoAdminToggle"
-                                IsOn="{x:Bind ViewModel.AutoAdmin, Mode=TwoWay}"/>
+                            Header="미리보기"
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Center">
+                            <Border x:Name="CornerPreviewWindow"
+                                   Width="200" Height="120"
+                                   Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                   BorderThickness="2"
+                                   CornerRadius="8"
+                                   Margin="0,16,0,16">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="32"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 타이틀 바 -->
+                                    <Grid Grid.Row="0" 
+                                         Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                         CornerRadius="8,8,0,0">
+                                        <TextBlock Text="미리보기" 
+                                                  VerticalAlignment="Center"
+                                                  Margin="12,0,0,0"
+                                                  FontSize="11"
+                                                  FontWeight="SemiBold"/>
+                                    </Grid>
+                                    
+                                    <!-- 내용 영역 -->
+                                    <Grid Grid.Row="1" Padding="12">
+                                        <TextBlock Text="선택한 모서리&#x0A;스타일 적용"
+                                                  TextAlignment="Center"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  FontSize="11"
+                                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>
 
-                <TextBlock
-                    Text="기타 설정"
-                    FontWeight="Bold"
-                    Margin="0, 14, 0, 7" />
-                <controls:SettingsCard
-                    Header="최소화"
-                    Description="창을 닫아도 트레이 아이콘으로 최소화하여 프로그램을 끄지 않습니다."
-                    Margin="0, 0, 0, 3">
-                    <ToggleSwitch
-                        IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}" />
-                </controls:SettingsCard>
-                <controls:SettingsCard
-                    Header="기본값으로 복원"
-                    Description="종료 시 모든 윈도우 설정을 기본값으로 복원"
-                    Margin="0, 0, 0, 3" >
-                    <ToggleSwitch
-                        IsOn="{x:Bind ViewModel.RestoreDefaultsOnExit, Mode=TwoWay}" />
-                </controls:SettingsCard>
-                <controls:SettingsCard
-                    Header="부팅 시 자동 실행"
-                    Margin="0, 0, 0, 3">
-                    <ToggleSwitch
-                        IsOn="{x:Bind ViewModel.RunOnBoot, Mode=TwoWay}" />
-                </controls:SettingsCard>
+                <!-- ========================================
+                     4. 애플리케이션 설정 그룹
+                     ======================================== -->
+                <TextBlock 
+                    Text="애플리케이션 설정" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                <!-- 관리자 권한 설정 (개선됨) -->
+                <controls:SettingsExpander
+                    Header="관리자 권한"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xe713;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <!-- 현재 상태 표시 -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border x:Name="AdminStatusBadge"
+                               Background="{ThemeResource SystemFillColorCriticalBrush}"
+                               CornerRadius="12"
+                               Padding="12,4,12,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon x:Name="AdminStatusIcon"
+                                         FontFamily="Segoe Fluent Icons" 
+                                         Glyph="&#xE7BA;"
+                                         FontSize="14"/>
+                                <TextBlock x:Name="AdminStatusTextHeader" 
+                                          Text="일반 사용자"
+                                          FontSize="12"
+                                          FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+                        <Button 
+                            x:Name="RestartWithAdminbutton"
+                            Content="관리자 권한으로 다시 시작"
+                            Click="RestartWithAdminbutton_Click"/>
+                    </StackPanel>
+                    
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="12">
+                                <InfoBar x:Name="AdminInfoBar"
+                                        IsOpen="True"
+                                        IsClosable="False"
+                                        Severity="Warning"
+                                        Title="현재 상태"
+                                        Message="일반 사용자 권한으로 실행 중입니다. 일부 창에 접근이 제한될 수 있습니다."/>
+                                
+                                <StackPanel>
+                                    <CheckBox x:Name="AutoAdminToggle"
+                                             IsChecked="{x:Bind ViewModel.AutoAdmin, Mode=TwoWay}">
+                                        <TextBlock TextWrapping="Wrap">
+                                            <Run Text="자동으로 관리자 권한 획득"/>
+                                            <LineBreak/>
+                                            <Run Text="프로그램 시작 시 자동으로 관리자 권한 요청" 
+                                                FontSize="11" 
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        </TextBlock>
+                                    </CheckBox>
+                                </StackPanel>
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- 시작 및 종료 설정 -->
+                <controls:SettingsExpander
+                    Header="시작 및 종료"
+                    Description="프로그램 시작 및 종료 동작 설정"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            Header="부팅 시 자동 실행"
+                            Description="Windows 시작 시 자동으로 프로그램 실행">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.RunOnBoot, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard
+                            Header="트레이로 최소화"
+                            Description="창을 닫아도 시스템 트레이에서 계속 실행">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+
+                        <controls:SettingsCard
+                            Header="종료 시 설정 복원"
+                            Description="프로그램 종료 시 모든 윈도우 설정을 기본값으로 복원">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.RestoreDefaultsOnExit, Mode=TwoWay}"/>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- UI 설정 -->
                 <controls:SettingsCard
                     Header="커스텀 타이틀 바"
-                    Margin="0, 0, 0, 3" >
-                    <ToggleSwitch
-                        IsOn="{x:Bind ViewModel.UseCustomTitleBar, Mode=TwoWay}" />
+                    Description="Windows 11 스타일의 커스텀 타이틀 바 사용"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A5;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.UseCustomTitleBar, Mode=TwoWay}"/>
                 </controls:SettingsCard>
+
+                <!-- ========================================
+                     5. 개발자 도구 그룹 (로그 뷰어 개선)
+                     ======================================== -->
+                <TextBlock 
+                    Text="개발자 도구" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
                 <controls:SettingsExpander
                     Header="자동 변경 추적 로그"
                     Description="AutoWindowChange 동작 중 수집된 창 추적 로그"
-                    Margin="0,10,0,0">
+                    Margin="0,0,0,3"
+                    x:Name="WindowTrackerLogExpander">
                     <controls:SettingsExpander.HeaderIcon>
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;"/>
                     </controls:SettingsExpander.HeaderIcon>
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.EnableWindowTrackerLog, Mode=TwoWay}"
+                        OnContent="활성화"
+                        OffContent="비활성화"
+                        ToolTipService.ToolTip="로그 수집을 활성화/비활성화합니다."/>
+                    
                     <controls:SettingsExpander.Items>
-                        <Grid>
+                        <controls:SettingsCard
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <Grid>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <TextBox
+                                
+                                <!-- 검색 및 필터 -->
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <TextBox Grid.Column="0"
+                                            x:Name="LogSearchBox"
+                                            PlaceholderText="🔍 로그 검색..."
+                                            TextChanged="LogSearchBox_TextChanged"
+                                            Margin="0,0,8,0"/>
+                                    
+                                    <ComboBox Grid.Column="1"
+                                             x:Name="LogFilterComboBox"
+                                             SelectedIndex="0"
+                                             SelectionChanged="LogFilterComboBox_SelectionChanged"
+                                             MinWidth="100">
+                                        <x:String>전체</x:String>
+                                        <x:String>오류</x:String>
+                                        <x:String>경고</x:String>
+                                        <x:String>정보</x:String>
+                                    </ComboBox>
+                                </Grid>
+                                
+                                <!-- 로그 표시 영역 -->
+                                <TextBox Grid.Row="1"
                                     x:Name="WindowTrackerLogBox"
                                     IsReadOnly="True"
                                     TextWrapping="NoWrap"
                                     FontFamily="Consolas"
-                                    MinHeight="140"
-                                    MaxHeight="240"
+                                    FontSize="11"
+                                    MinHeight="180"
+                                    MaxHeight="300"
                                     AcceptsReturn="True"
                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                    ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-                                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-                                    <Button Content="새로고침" Click="RefreshWindowTrackerLogs_Click"/>
-                                    <Button Content="복사" Click="CopyWindowTrackerLogs_Click"/>
-                                    <Button Content="지우기" Click="ClearWindowTrackerLogs_Click"/>
+                                    ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                    Text="[로그가 표시됩니다]"/>
+                                
+                                <!-- 통계 정보 -->
+                                <Grid Grid.Row="2" Margin="0,8,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16">
+                                        <TextBlock FontSize="11">
+                                            <Run Text="로그 수:"/>
+                                            <Run x:Name="TotalLogCountText" Text="0" FontWeight="Bold"/>
+                                            <Run Text="개"/>
+                                        </TextBlock>
+                                        <TextBlock FontSize="11">
+                                            <Run Text="오류:"/>
+                                            <Run x:Name="ErrorLogCountText" Text="0" FontWeight="Bold" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                            <Run Text="개"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    
+                                    <CheckBox Grid.Column="1"
+                                             x:Name="AutoScrollCheckBox"
+                                             Content="자동 스크롤"
+                                             IsChecked="True"
+                                             FontSize="11"/>
+                                </Grid>
+                                
+                                <!-- 버튼 영역 -->
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                    <Button Click="RefreshWindowTrackerLogs_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="14"/>
+                                            <TextBlock Text="새로고침"/>
+                                        </StackPanel>
+                                        <Button.KeyboardAccelerators>
+                                            <KeyboardAccelerator Key="F5"/>
+                                        </Button.KeyboardAccelerators>
+                                    </Button>
+                                    <Button Click="CopyWindowTrackerLogs_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" FontSize="14"/>
+                                            <TextBlock Text="복사"/>
+                                        </StackPanel>
+                                        <Button.KeyboardAccelerators>
+                                            <KeyboardAccelerator Modifiers="Control" Key="C"/>
+                                        </Button.KeyboardAccelerators>
+                                    </Button>
+                                    <Button Click="ExportWindowTrackerLogs_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEDE1;" FontSize="14"/>
+                                            <TextBlock Text="내보내기"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Click="ClearWindowTrackerLogs_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="14"/>
+                                            <TextBlock Text="지우기"/>
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
-                        </Grid> 
+                            </Grid>
+                        </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>
+
             </StackPanel>
         </ScrollViewer>
-
     </Grid>
 </Page>

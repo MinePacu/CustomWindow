@@ -10,110 +10,364 @@
     mc:Ignorable="d">
 
     <Grid HorizontalAlignment="Stretch" MaxWidth="990">
-        <ScrollViewer HorizontalAlignment="Stretch" IsDeferredScrollingEnabled="True" VerticalScrollBarVisibility="Visible" MaxWidth="990" Margin="0,20,0,20">
-            <StackPanel x:Name="Panel" HorizontalAlignment="Stretch" Spacing="8">
-                <TextBlock Text="색 설정" Margin="0,14,0,4" FontSize="14" FontWeight="Bold" />
+        <ScrollViewer HorizontalAlignment="Stretch" IsDeferredScrollingEnabled="True" 
+                     VerticalScrollBarVisibility="Visible" MaxWidth="990" Margin="0,20,0,20">
+            <StackPanel x:Name="Panel" HorizontalAlignment="Stretch" Spacing="4">
+                
+                <!-- ========================================
+                     섹션 1: 테두리 색상
+                     ======================================== -->
+                <TextBlock 
+                    Text="테두리 색상" 
+                    Margin="0,0,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
-                <controls:SettingsExpander Header="테두리(모서리) 색">
+                <controls:SettingsExpander 
+                    Header="테두리 색상 및 두께"
+                    Description="창의 외곽 테두리 스타일을 설정합니다"
+                    Margin="0,0,0,3">
                     <controls:SettingsExpander.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE91F;"/>
                     </controls:SettingsExpander.HeaderIcon>
+                    
+                    <!-- 헤더 영역: 빠른 프리뷰 -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border Width="80" Height="32" 
+                               Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" 
+                               CornerRadius="6"
+                               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                               BorderThickness="1">
+                            <TextBlock Text="프리뷰" 
+                                      HorizontalAlignment="Center" 
+                                      VerticalAlignment="Center"
+                                      Foreground="White"
+                                      FontSize="11"
+                                      FontWeight="SemiBold"/>
+                        </Border>
+                        <TextBlock Text="{x:Bind ViewModel.BorderColorHex, Mode=OneWay}" 
+                                  VerticalAlignment="Center"
+                                  FontFamily="Consolas"
+                                  FontWeight="SemiBold"
+                                  FontSize="13"/>
+                    </StackPanel>
+                    
                     <controls:SettingsExpander.Items>
-                        <controls:SettingsCard Header="시스템 색상 사용">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderSystemColor, Mode=TwoWay}"/>
+                        <!-- 색상 프리셋 -->
+                        <controls:SettingsCard 
+                            Header="빠른 색상 프리셋"
+                            Description="자주 사용하는 색상을 빠르게 선택">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#E81123" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="빨강"
+                                       Click="PresetColor_Click" Tag="#FFE81123"/>
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#FF8C00" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="주황"
+                                       Click="PresetColor_Click" Tag="#FFFF8C00"/>
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#FFB900" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="노랑"
+                                       Click="PresetColor_Click" Tag="#FFFFB900"/>
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#00A300" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="초록"
+                                       Click="PresetColor_Click" Tag="#FF00A300"/>
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#0078D4" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="파랑"
+                                       Click="PresetColor_Click" Tag="#FF0078D4"/>
+                                <Button Width="40" Height="40" Padding="0" 
+                                       Background="#8E24AA" CornerRadius="20"
+                                       BorderThickness="0"
+                                       ToolTipService.ToolTip="보라"
+                                       Click="PresetColor_Click" Tag="#FF8E24AA"/>
+                            </StackPanel>
                         </controls:SettingsCard>
-                        <controls:SettingsCard Header="투명">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseBorderTransparency, Mode=TwoWay}"/>
+
+                        <!-- 커스텀 색상 선택 -->
+                        <controls:SettingsCard 
+                            Header="커스텀 색상"
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- ColorPicker -->
+                                <ColorPicker Grid.Row="0"
+                                           x:Name="BorderColorPicker"
+                                           Color="{x:Bind ViewModel.BorderColor, Mode=TwoWay}" 
+                                           IsAlphaEnabled="True" 
+                                           IsAlphaSliderVisible="True"
+                                           IsHexInputVisible="True"
+                                           ColorChanged="BorderColorPicker_ColorChanged"
+                                           HorizontalAlignment="Stretch"
+                                           Margin="0,8,0,12"/>
+                                
+                                <!-- RGB/HEX 정보 -->
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Grid.Column="0" Spacing="8" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock Text="HEX:" Width="40" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <TextBox Text="{x:Bind ViewModel.BorderColorHex, Mode=OneWay}" 
+                                                    IsReadOnly="True" 
+                                                    Width="140"
+                                                    FontFamily="Consolas"/>
+                                            <Button Content="📋 복사" 
+                                                   Click="CopyBorderHexColor_Click"
+                                                   ToolTipService.ToolTip="HEX 값 복사"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    
+                                    <Border Grid.Column="1" 
+                                           Width="60" Height="60" 
+                                           Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}"
+                                           CornerRadius="8"
+                                           BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                           BorderThickness="2"/>
+                                </Grid>
+                            </Grid>
                         </controls:SettingsCard>
-                        <controls:SettingsCard Header="테두리 두께" Description="픽셀 단위로 설정합니다 (1-20)">
-                            <StackPanel Orientation="Vertical" Spacing="8">
+
+                        <!-- 테두리 두께 -->
+                        <controls:SettingsCard 
+                            Header="테두리 두께" 
+                            Description="1픽셀에서 20픽셀까지 조정 가능">
+                            <StackPanel Orientation="Vertical" Spacing="8" MinWidth="250">
                                 <Slider x:Name="BorderThicknessSlider" 
                                        Minimum="1" Maximum="20" StepFrequency="1" 
                                        Value="{x:Bind ViewModel.BorderThickness, Mode=TwoWay}" 
                                        ValueChanged="BorderThicknessSlider_ValueChanged"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="현재 두께:"/>
-                                    <TextBlock Text="{x:Bind ViewModel.BorderThickness, Mode=OneWay}" FontWeight="SemiBold"/>
-                                </StackPanel>
+                                <TextBlock HorizontalAlignment="Center" FontSize="13">
+                                    <Run Text="현재 두께:"/>
+                                    <Run Text="{x:Bind ViewModel.BorderThickness, Mode=OneWay}" FontWeight="Bold"/>
+                                    <Run Text="px"/>
+                                </TextBlock>
                             </StackPanel>
                         </controls:SettingsCard>
-                        <controls:SettingsCard Header="색 선택">
-                            <StackPanel Orientation="Vertical" Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Border Width="110" Height="25" Background="{x:Bind ViewModel.BorderBrush, Mode=OneWay}" CornerRadius="4"/>
-                                    <ColorPicker x:Name="BorderColorPicker"
-                                               Color="{x:Bind ViewModel.BorderColor, Mode=TwoWay}" 
-                                               IsAlphaEnabled="True" 
-                                               IsAlphaSliderVisible="True"
-                                               IsHexInputVisible="True"
-                                               ColorChanged="BorderColorPicker_ColorChanged"
-                                               MinWidth="260" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <TextBlock Text="HEX:" VerticalAlignment="Center"/>
-                                    <TextBox Width="120" Text="{x:Bind ViewModel.BorderColorHex, Mode=OneWay}" IsReadOnly="True"/>
-                                    <Border Width="24" Height="24" CornerRadius="4" BorderThickness="1" BorderBrush="#33000000" Background="{x:Bind ViewModel.BorderBrush}"/>
-                                </StackPanel>
+
+                        <!-- 고급 옵션 -->
+                        <controls:SettingsCard Header="고급 옵션">
+                            <StackPanel Spacing="12">
+                                <CheckBox Content="시스템 색상 사용" 
+                                         IsChecked="{x:Bind ViewModel.UseBorderSystemColor, Mode=TwoWay}"/>
+                                <CheckBox Content="투명 효과 적용" 
+                                         IsChecked="{x:Bind ViewModel.UseBorderTransparency, Mode=TwoWay}"/>
                             </StackPanel>
                         </controls:SettingsCard>
                     </controls:SettingsExpander.Items>
                 </controls:SettingsExpander>
 
-                <controls:SettingsExpander Header="제목 표시줄 색" Description="기본은 윈도우 색상 및 설정에 따릅니다.">
-                    <controls:SettingsExpander.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
-                    </controls:SettingsExpander.HeaderIcon>
-                    <controls:SettingsExpander.Items>
-                        <controls:SettingsCard Header="시스템 색상 사용">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionSystemColor, Mode=TwoWay}"/>
-                        </controls:SettingsCard>
-                        <controls:SettingsCard Header="투명">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTransparency, Mode=TwoWay}"/>
-                        </controls:SettingsCard>
-                        <controls:SettingsCard Header="색 선택">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.CaptionBrush, Mode=OneWay}" CornerRadius="4"/>
-                                <ColorPicker Color="{x:Bind ViewModel.CaptionColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
-                            </StackPanel>
-                        </controls:SettingsCard>
-                    </controls:SettingsExpander.Items>
-                </controls:SettingsExpander>
+                <!-- ========================================
+                     섹션 2: 제목 표시줄 색상 (Windows 11+)
+                     ======================================== -->
+                <TextBlock 
+                    Text="제목 표시줄 색상" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
-                <controls:SettingsExpander Header="제목 표시줄 글자 색">
-                    <controls:SettingsExpander.HeaderIcon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xf354;" />
-                    </controls:SettingsExpander.HeaderIcon>
-                    <controls:SettingsExpander.Items>
-                        <controls:SettingsCard Header="시스템 색상 사용">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTextSystemColor, Mode=TwoWay}"/>
-                        </controls:SettingsCard>
-                        <controls:SettingsCard Header="투명">
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCaptionTextTransparency, Mode=TwoWay}"/>
-                        </controls:SettingsCard>
-                        <controls:SettingsCard Header="텍스트 색 선택">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Border Width="110" Height="25" Background="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" CornerRadius="4"/>
-                                <ColorPicker Color="{x:Bind ViewModel.CaptionTextColor, Mode=TwoWay}" IsAlphaEnabled="True" MinWidth="260" />
-                            </StackPanel>
-                        </controls:SettingsCard>
-                        <controls:SettingsCard Header="색상 모드">
-                            <ComboBox SelectedItem="{x:Bind ViewModel.CaptionTextColorMode, Mode=TwoWay}">
-                                <x:String>자동</x:String>
-                                <x:String>수동</x:String>
-                            </ComboBox>
-                        </controls:SettingsCard>
-                    </controls:SettingsExpander.Items>
-                </controls:SettingsExpander>
-
-                <controls:SettingsCard Header="캡션 색상 모드" Margin="0,14,0,4">
-                    <controls:SettingsCard.Content>
-                        <ComboBox SelectedItem="{x:Bind ViewModel.CaptionColorMode, Mode=TwoWay}">
-                            <x:String>밝게</x:String>
-                            <x:String>어둡게</x:String>
-                            <x:String>커스텀</x:String>
-                        </ComboBox>
-                    </controls:SettingsCard.Content>
+                <!-- 캡션 색상 모드 선택 -->
+                <controls:SettingsCard 
+                    Header="캡션 색상 모드"
+                    Description="제목 표시줄의 색상 적용 방식 선택"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ComboBox x:Name="CaptionModeComboBox" 
+                             SelectedItem="{x:Bind ViewModel.CaptionColorMode, Mode=TwoWay}"
+                             MinWidth="150">
+                        <x:String>밝게</x:String>
+                        <x:String>어둡게</x:String>
+                        <x:String>커스텀</x:String>
+                    </ComboBox>
                 </controls:SettingsCard>
+
+                <!-- 커스텀 캡션 색상 (Windows 11 전용) -->
+                <controls:SettingsExpander 
+                    x:Name="CaptionColorExpander"
+                    Header="캡션 배경 색상"
+                    Description="Windows 11+ 전용 - 제목 표시줄 배경색"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE771;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <Border Width="80" Height="32" 
+                           Background="{x:Bind ViewModel.CaptionBrush, Mode=OneWay}" 
+                           CornerRadius="6"
+                           BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                           BorderThickness="1"/>
+                    
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <ColorPicker Grid.Row="0"
+                                           Color="{x:Bind ViewModel.CaptionColor, Mode=TwoWay}" 
+                                           IsAlphaEnabled="True"
+                                           HorizontalAlignment="Stretch"
+                                           Margin="0,8,0,12"/>
+                                
+                                <StackPanel Grid.Row="1" Spacing="12">
+                                    <CheckBox Content="시스템 색상 사용" 
+                                             IsChecked="{x:Bind ViewModel.UseCaptionSystemColor, Mode=TwoWay}"/>
+                                    <CheckBox Content="투명 효과 적용" 
+                                             IsChecked="{x:Bind ViewModel.UseCaptionTransparency, Mode=TwoWay}"/>
+                                </StackPanel>
+                            </Grid>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- 캡션 텍스트 색상 (Windows 11 전용) -->
+                <controls:SettingsExpander 
+                    x:Name="CaptionTextColorExpander"
+                    Header="캡션 텍스트 색상"
+                    Description="Windows 11+ 전용 - 제목 표시줄 글자색"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D2;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border Width="80" Height="32" 
+                               Background="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" 
+                               CornerRadius="6"
+                               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                               BorderThickness="1"/>
+                        <ComboBox SelectedItem="{x:Bind ViewModel.CaptionTextColorMode, Mode=TwoWay}"
+                                 MinWidth="100">
+                            <x:String>자동</x:String>
+                            <x:String>수동</x:String>
+                        </ComboBox>
+                    </StackPanel>
+                    
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <ColorPicker Grid.Row="0"
+                                           Color="{x:Bind ViewModel.CaptionTextColor, Mode=TwoWay}" 
+                                           IsAlphaEnabled="True"
+                                           HorizontalAlignment="Stretch"
+                                           Margin="0,8,0,12"/>
+                                
+                                <StackPanel Grid.Row="1" Spacing="12">
+                                    <CheckBox Content="시스템 색상 사용" 
+                                             IsChecked="{x:Bind ViewModel.UseCaptionTextSystemColor, Mode=TwoWay}"/>
+                                    <CheckBox Content="투명 효과 적용" 
+                                             IsChecked="{x:Bind ViewModel.UseCaptionTextTransparency, Mode=TwoWay}"/>
+                                </StackPanel>
+                            </Grid>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- ========================================
+                     섹션 3: 실시간 미리보기
+                     ======================================== -->
+                <TextBlock 
+                    Text="미리보기" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                <controls:SettingsCard 
+                    Header="실시간 미리보기"
+                    Description="설정한 색상을 바로 확인할 수 있습니다"
+                    ContentAlignment="Vertical"
+                    HorizontalContentAlignment="Center"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8F4;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    
+                    <!-- 모의 창 미리보기 -->
+                    <Border x:Name="PreviewWindow"
+                           Width="350" Height="220"
+                           CornerRadius="8"
+                           BorderThickness="3"
+                           BorderBrush="{x:Bind ViewModel.BorderBrush, Mode=OneWay}"
+                           Background="{ThemeResource LayerFillColorDefaultBrush}"
+                           Margin="0,16,0,16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="40"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- 타이틀 바 -->
+                            <Grid Grid.Row="0" 
+                                 Background="{x:Bind ViewModel.CaptionBrush, Mode=OneWay}"
+                                 CornerRadius="8,8,0,0">
+                                <TextBlock Text="미리보기 창" 
+                                          Foreground="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}"
+                                          VerticalAlignment="Center"
+                                          Margin="12,0,0,0"
+                                          FontWeight="SemiBold"
+                                          FontSize="13"/>
+                                <StackPanel Orientation="Horizontal" 
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           Spacing="12">
+                                    <TextBlock Text="─" 
+                                              Foreground="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" 
+                                              FontSize="16"
+                                              FontWeight="Normal"/>
+                                    <TextBlock Text="□" 
+                                              Foreground="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" 
+                                              FontSize="14"
+                                              FontWeight="Normal"/>
+                                    <TextBlock Text="✕" 
+                                              Foreground="{x:Bind ViewModel.CaptionTextBrush, Mode=OneWay}" 
+                                              FontSize="14"
+                                              FontWeight="Normal"/>
+                                </StackPanel>
+                            </Grid>
+                            
+                            <!-- 내용 영역 -->
+                            <Grid Grid.Row="1" Padding="20">
+                                <TextBlock Text="설정한 테두리와 제목 표시줄&#x0a;색상이 여기에 적용됩니다."
+                                          TextWrapping="Wrap"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextAlignment="Center"
+                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                          FontSize="13"
+                                          LineHeight="20"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </controls:SettingsCard>
+
             </StackPanel>
         </ScrollViewer>
     </Grid>

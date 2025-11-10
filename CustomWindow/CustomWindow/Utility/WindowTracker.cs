@@ -20,6 +20,8 @@ public static class WindowTracker
     private static readonly int _logCapacity = 500;
     private static readonly ConcurrentQueue<string> _logs = new();
     public static event Action<string>? LogAdded;
+    
+    private static bool _loggingEnabled = true; // 로그 활성화 여부
 
     // New: notify when window set changes (for EXE IPC)
     public static event Action<IReadOnlyCollection<nint>>? WindowSetChanged;
@@ -257,9 +259,25 @@ public static class WindowTracker
 
     /// <summary>외부 호출(BorderService 등)에서 로그를 로그 큐에 추가하기 위한 헬퍼.</summary>
     public static void AddExternalLog(string message) => AddLog(message);
+    
+    /// <summary>로깅 활성화/비활성화 설정</summary>
+    public static void SetLoggingEnabled(bool enabled)
+    {
+        _loggingEnabled = enabled;
+        if (!enabled)
+        {
+            AddLog("로깅 비활성화됨 - 새 로그가 수집되지 않습니다");
+        }
+        else
+        {
+            AddLog("로깅 활성화됨");
+        }
+    }
 
     private static void AddLog(string message)
     {
+        if (!_loggingEnabled && !message.Contains("로깅")) return; // 로깅 비활성화 상태에서는 로깅 관련 메시지만 허용
+        
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
         _logs.Enqueue(line);
         while (_logs.Count > _logCapacity && _logs.TryDequeue(out _)) { }

@@ -58,4 +58,5 @@ public sealed partial class ObservableConfig : INotifyPropertyChanged
     public int WindowApplyDelayMs { get => _cfg.WindowApplyDelayMs; set => Set(_cfg.WindowApplyDelayMs, value, v => _cfg.WindowApplyDelayMs = v, nameof(WindowApplyDelayMs)); }
     public bool ShowBorderServiceConsole { get => _cfg.ShowBorderServiceConsole; set => Set(_cfg.ShowBorderServiceConsole, value, v => _cfg.ShowBorderServiceConsole = v, nameof(ShowBorderServiceConsole)); }
     public string BorderRenderMode { get => _cfg.BorderRenderMode; set => Set(_cfg.BorderRenderMode, value, v => _cfg.BorderRenderMode = v, nameof(BorderRenderMode)); }
+    public bool EnableWindowTrackerLog { get => _cfg.EnableWindowTrackerLog; set => Set(_cfg.EnableWindowTrackerLog, value, v => _cfg.EnableWindowTrackerLog = v, nameof(EnableWindowTrackerLog)); }
 }

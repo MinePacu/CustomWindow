@@ -240,6 +240,81 @@ public static class DwmWindowManager
         };
     }
 
+    /// <summary>
+    /// 현재 Windows 버전이 커스텀 캡션 색상을 지원하는지 확인합니다.
+    /// </summary>
+    public static bool SupportsCustomCaptionColors()
+    {
+        return IsWindows11OrGreater();
+    }
+    
+    /// <summary>
+    /// 창의 모서리 스타일을 설정합니다. (Windows 11+ 전용)
+    /// </summary>
+    /// <param name="hwnd">대상 창 핸들</param>
+    /// <param name="cornerMode">모서리 모드: "기본", "둥글게 하지 않음", "둥글게", "덜 둥글게"</param>
+    /// <returns>성공 여부</returns>
+    public static bool SetCornerPreference(IntPtr hwnd, string? cornerMode)
+    {
+        // Windows 11 전용 기능
+        if (!IsWindows11OrGreater())
+        {
+            WindowTracker.AddExternalLog($"[Win10] SetCornerPreference is only supported on Windows 11+");
+            return false;
+        }
+
+        try
+        {
+            // DWMWCP (DWM Window Corner Preference) 값
+            const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+            const int DWMWCP_DEFAULT = 0;           // 기본 (시스템 설정 따름)
+            const int DWMWCP_DONOTROUND = 1;        // 둥글게 하지 않음
+            const int DWMWCP_ROUND = 2;             // 둥글게
+            const int DWMWCP_ROUNDSMALL = 3;        // 덜 둥글게
+
+            int preference = cornerMode?.Trim() switch
+            {
+                "둥글게 하지 않음" => DWMWCP_DONOTROUND,
+                "둥글게" => DWMWCP_ROUND,
+                "덜 둥글게" => DWMWCP_ROUNDSMALL,
+                "기본" or null or "" => DWMWCP_DEFAULT,
+                _ => DWMWCP_DEFAULT
+            };
+
+            int result = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
+            
+            if (result != 0)
+            {
+                WindowTracker.AddExternalLog($"SetCornerPreference failed for hwnd=0x{hwnd.ToInt64():X}, HRESULT=0x{result:X}");
+                return false;
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            WindowTracker.AddExternalLog($"SetCornerPreference exception: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Windows 11 이상인지 확인 (빌드 22000 이상)
+    /// </summary>
+    private static bool IsWindows11OrGreater()
+    {
+        try
+        {
+            var version = Environment.OSVersion.Version;
+            // Windows 11은 빌드 22000 이상
+            return version.Major >= 10 && version.Build >= 22000;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     #region P/Invoke
 
     [DllImport("dwmapi.dll", PreserveSig = true)]

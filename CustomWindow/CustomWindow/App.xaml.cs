@@ -174,5 +174,8 @@ namespace CustomWindow
                 catch { }
             };
         }
+
+        // Window에 접근할 수 있도록 public 속성 추가
+        public Window? Window => _window;
     }
 }

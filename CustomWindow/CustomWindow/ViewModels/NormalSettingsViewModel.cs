@@ -239,7 +239,83 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    public string? WindowCornerMode { get => _config.WindowCornerMode; set { _config.WindowCornerMode = value; BorderService.UpdateCornerMode(value); } }
+    public string? WindowCornerMode 
+    { 
+        get => _config.WindowCornerMode; 
+        set 
+        { 
+            if (_config.WindowCornerMode == value) return;
+            
+            _config.WindowCornerMode = value; 
+            OnPropertyChanged();
+            
+            // BorderService를 통해 C++ EXE에 전달
+            BorderService.UpdateCornerMode(value);
+            
+            // Windows 11에서 즉시 모든 창에 적용
+            if (DwmWindowManager.SupportsCustomCaptionColors()) // Windows 11+
+            {
+                try
+                {
+                    ApplyCornerModeToAllWindows(value);
+                    WindowTracker.AddExternalLog($"창 모서리 스타일 변경: {value ?? "기본"} (실시간 적용)");
+                }
+                catch (Exception ex)
+                {
+                    WindowTracker.AddExternalLog($"창 모서리 스타일 적용 실패: {ex.Message}");
+                }
+            }
+            else
+            {
+                WindowTracker.AddExternalLog($"창 모서리 스타일 변경: {value ?? "기본"} (Windows 10에서는 지원 안됨)");
+            }
+        } 
+    }
+    
+    /// <summary>
+    /// 모든 창에 모서리 스타일을 즉시 적용합니다.
+    /// </summary>
+    private void ApplyCornerModeToAllWindows(string? cornerMode)
+    {
+        if (!AutoWindowChange)
+        {
+            WindowTracker.AddExternalLog("AutoWindowChange가 비활성화되어 모서리 스타일을 적용하지 않습니다");
+            return;
+        }
+
+        try
+        {
+            // WindowTracker에서 현재 추적 중인 창 목록 가져오기
+            var windows = WindowTracker.CurrentWindowHandles;
+            if (windows == null || windows.Count == 0)
+            {
+                WindowTracker.AddExternalLog("적용할 창이 없습니다");
+                return;
+            }
+
+            int successCount = 0;
+            foreach (var handle in windows)
+            {
+                try
+                {
+                    if (DwmWindowManager.SetCornerPreference((IntPtr)handle, cornerMode))
+                    {
+                        successCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WindowTracker.AddExternalLog($"창 0x{handle:X} 모서리 스타일 적용 실패: {ex.Message}");
+                }
+            }
+
+            WindowTracker.AddExternalLog($"창 모서리 스타일 적용 완료: {successCount}/{windows.Count}개 창");
+        }
+        catch (Exception ex)
+        {
+            WindowTracker.AddExternalLog($"ApplyCornerModeToAllWindows 오류: {ex.Message}");
+        }
+    }
 
     private bool _autoAdminApplying; // 전환 중
     public bool AutoAdmin
@@ -275,4 +351,24 @@ public partial class NormalSettingsViewModel : ObservableObject
     public bool RestoreDefaultsOnExit { get => _config.RestoreDefaultsOnExit; set { _config.RestoreDefaultsOnExit = value; OnPropertyChanged(); } }
     public bool RunOnBoot { get => _config.RunOnBoot; set { _config.RunOnBoot = value; OnPropertyChanged(); } }
     public bool UseCustomTitleBar { get => _config.UseCustomTitleBar; set { _config.UseCustomTitleBar = value; OnPropertyChanged(); } }
+    
+    public bool EnableWindowTrackerLog 
+    { 
+        get => _config.EnableWindowTrackerLog; 
+        set 
+        { 
+            if (_config.EnableWindowTrackerLog == value) return;
+            _config.EnableWindowTrackerLog = value;
+            OnPropertyChanged();
+            WindowTracker.SetLoggingEnabled(value);
+            if (value)
+            {
+                WindowTracker.AddExternalLog("자동 변경 추적 로그 활성화");
+            }
+            else
+            {
+                WindowTracker.AddExternalLog("자동 변경 추적 로그 비활성화");
+            }
+        } 
+    }
 }

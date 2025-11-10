@@ -9,81 +9,240 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     mc:Ignorable="d">
 
-    <StackPanel
-        Margin="0, 7, 0, 0"
-        MaxWidth="990">
+    <Grid HorizontalAlignment="Stretch" MaxWidth="990">
+        <ScrollViewer
+            HorizontalAlignment="Stretch"
+            IsDeferredScrollingEnabled="True"
+            VerticalScrollBarVisibility="Visible"
+            MaxWidth="990"
+            Margin="0,20,0,20">
+            <StackPanel HorizontalAlignment="Stretch" Spacing="4">
 
-        <TextBlock
-            Text="기타 설정"
-            FontWeight="Bold"
-            Margin="0, 14, 0, 7" />
+                <!-- ========================================
+                     섹션 1: 작업 표시줄 설정
+                     ======================================== -->
+                <TextBlock 
+                    Text="작업 표시줄" 
+                    Margin="0,0,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
-        <controls:SettingsExpander
-            Header="작업 표시줄 테두리 색 설정"
-            Margin="0, 0, 0, 3">
-            <ToggleSwitch
-                Header="사용"
-                IsOn="{x:Bind ViewModel.EnableTaskbarBorder, Mode=TwoWay}" />
+                <controls:SettingsExpander
+                    Header="작업 표시줄 테두리 설정"
+                    Description="Windows 작업 표시줄에 커스텀 테두리 적용"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C4;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.EnableTaskbarBorder, Mode=TwoWay}"
+                        OnContent="켜짐"
+                        OffContent="꺼짐"/>
 
-            <controls:SettingsExpander.Items>
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            Header="모서리 스타일"
+                            Description="작업 표시줄 모서리 둥글기 설정"
+                            IsEnabled="{x:Bind ViewModel.EnableTaskbarBorder, Mode=OneWay}">
+                            <controls:SettingsCard.HeaderIcon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE91F;"/>
+                            </controls:SettingsCard.HeaderIcon>
+                            <ComboBox
+                                SelectedItem="{x:Bind ViewModel.TaskbarCornerMode, Mode=TwoWay}"
+                                MinWidth="150">
+                                <x:String>기본</x:String>
+                                <x:String>둥글게</x:String>
+                                <x:String>덜 둥글게</x:String>
+                            </ComboBox>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- ========================================
+                     섹션 2: 고급 창 설정
+                     ======================================== -->
+                <TextBlock 
+                    Text="고급 창 설정" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
                 <controls:SettingsCard
-                    Header="모서리 모드">
-                    <ComboBox
-                        SelectedItem="{x:Bind ViewModel.TaskbarCornerMode, Mode=TwoWay}">
-                        <x:String>기본</x:String>
-                        <x:String>둥글게</x:String>
-                        <x:String>덜 둥글게</x:String>
-                    </ComboBox>
+                    Header="창 제목을 공백으로 변경"
+                    Description="모든 창의 제목 표시줄 텍스트를 빈 문자열로 강제 변경합니다"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D3;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ToggleSwitch 
+                        IsOn="{x:Bind ViewModel.ForceEmptyWindowTitles, Mode=TwoWay}"
+                        OnContent="켜짐"
+                        OffContent="꺼짐"/>
                 </controls:SettingsCard>
-            </controls:SettingsExpander.Items>
-        </controls:SettingsExpander>
 
-        <controls:SettingsCard
-            Header="공백 문자로 바꾸기"
-            Margin="0, 0, 0, 3">
-            <controls:SettingsCard.HeaderIcon>
-                <FontIcon 
-                    FontFamily="Segoe Fluent Icons" 
-                    Glyph="&#xe943;"/>
-            </controls:SettingsCard.HeaderIcon>
-            <ToggleSwitch 
-                IsOn="{x:Bind ViewModel.ForceEmptyWindowTitles, Mode=TwoWay}" />
-        </controls:SettingsCard>
+                <controls:SettingsCard
+                    Header="테두리 색상 강제 적용"
+                    Description="창의 기본 테두리 색상을 무시하고 설정한 색상을 강제로 적용합니다"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    <ToggleSwitch 
+                        IsOn="{x:Bind ViewModel.ForceBorderColor, Mode=TwoWay}"
+                        OnContent="켜짐"
+                        OffContent="꺼짐"/>
+                </controls:SettingsCard>
 
-        <controls:SettingsCard
-            Header="모서리 색상 강제 설정"
-            Margin="0, 0, 0, 3">
-            <controls:SettingsCard.HeaderIcon>
-                <FontIcon 
-                    FontFamily="Segoe Fluent Icons" 
-                    Glyph="&#xe943;"/>
-            </controls:SettingsCard.HeaderIcon>
-            <ToggleSwitch 
-                IsOn="{x:Bind ViewModel.ForceBorderColor, Mode=TwoWay}" />
-        </controls:SettingsCard>
+                <!-- ========================================
+                     섹션 3: 성능 및 타이밍
+                     ======================================== -->
+                <TextBlock 
+                    Text="성능 및 타이밍" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
 
-        <controls:SettingsCard
-            Header="창 적용 지연 시간 (ms)"
-            Margin="0, 0, 0, 3">
-            <controls:SettingsCard.HeaderIcon>
-                <FontIcon 
-                    FontFamily="Segoe Fluent Icons" 
-                    Glyph="&#xe943;"/>
-            </controls:SettingsCard.HeaderIcon>
-            <TextBox
-                Text="{x:Bind ViewModel.WindowApplyDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                Width="120"/>
-        </controls:SettingsCard>
+                <controls:SettingsExpander
+                    Header="창 스타일 적용 지연 시간"
+                    Description="새 창이 생성될 때 스타일을 적용하기 전 대기 시간 (밀리초)"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE916;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock 
+                            Text="{x:Bind ViewModel.WindowApplyDelayMs, Mode=OneWay}"
+                            VerticalAlignment="Center"
+                            FontWeight="SemiBold"
+                            MinWidth="40"/>
+                        <TextBlock 
+                            Text="ms"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
 
-        <controls:SettingsCard
-            Header="창 관리자 다시 시작"
-            Margin="0, 0, 0, 3"
-            IsClickEnabled="True">
-            <controls:SettingsCard.HeaderIcon>
-                <FontIcon 
-                    FontFamily="Segoe Fluent Icons" 
-                    Glyph="&#xe943;"/>
-            </controls:SettingsCard.HeaderIcon>
-        </controls:SettingsCard>
-    </StackPanel>
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            Header="지연 시간 조정"
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="12">
+                                <Slider 
+                                    x:Name="DelaySlider"
+                                    Minimum="0" 
+                                    Maximum="2000" 
+                                    StepFrequency="50"
+                                    Value="{x:Bind ViewModel.WindowApplyDelayMs, Mode=TwoWay}"
+                                    Header="슬라이더로 조정"/>
+                                
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <TextBlock 
+                                        Grid.Column="0"
+                                        Text="직접 입력:"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,12,0"/>
+                                    
+                                    <TextBox
+                                        Grid.Column="1"
+                                        Text="{x:Bind ViewModel.WindowApplyDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="0 ~ 2000"
+                                        MaxWidth="120"
+                                        HorizontalAlignment="Left"/>
+                                </Grid>
+                                
+                                <InfoBar
+                                    Severity="Informational"
+                                    IsOpen="True"
+                                    IsClosable="False"
+                                    Title="권장 설정"
+                                    Message="대부분의 경우 0ms가 적합합니다. 창 깜빡임이 발생하면 100-300ms로 설정하세요."/>
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- ========================================
+                     섹션 4: 시스템 관리
+                     ======================================== -->
+                <TextBlock 
+                    Text="시스템 관리" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                <controls:SettingsExpander
+                    Header="Windows 탐색기 재시작"
+                    Description="Windows 탐색기(explorer.exe)를 재시작하여 시스템 UI를 새로고침합니다"
+                    Margin="0,0,0,3">
+                    <controls:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;"/>
+                    </controls:SettingsExpander.HeaderIcon>
+                    
+                    <Button 
+                        x:Name="RestartExplorerButton"
+                        Content="탐색기 재시작"
+                        Click="RestartExplorerButton_Click"/>
+
+                    <controls:SettingsExpander.Items>
+                        <controls:SettingsCard
+                            ContentAlignment="Vertical"
+                            HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="12">
+                                <InfoBar
+                                    Severity="Warning"
+                                    IsOpen="True"
+                                    IsClosable="False"
+                                    Title="주의사항"
+                                    Message="탐색기를 재시작하면 작업 표시줄과 시작 메뉴가 일시적으로 사라집니다. 진행 중인 작업을 저장하세요."/>
+                                
+                                <TextBlock 
+                                    TextWrapping="Wrap"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                    <Run Text="탐색기 재시작이 필요한 경우:"/>
+                                    <LineBreak/>
+                                    <Run Text="• 작업 표시줄 테두리가 적용되지 않을 때"/>
+                                    <LineBreak/>
+                                    <Run Text="• 시스템 UI가 응답하지 않을 때"/>
+                                    <LineBreak/>
+                                    <Run Text="• 설정 변경 후 즉시 반영되지 않을 때"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </controls:SettingsExpander.Items>
+                </controls:SettingsExpander>
+
+                <!-- ========================================
+                     섹션 5: 정보
+                     ======================================== -->
+                <TextBlock 
+                    Text="추가 정보" 
+                    Margin="0,20,0,4" 
+                    FontSize="16" 
+                    FontWeight="SemiBold" 
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+
+                <controls:SettingsCard
+                    Header="이 설정들에 대하여"
+                    Description="고급 사용자를 위한 실험적 기능입니다"
+                    Margin="0,0,0,3">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"/>
+                    </controls:SettingsCard.HeaderIcon>
+                    
+                    <HyperlinkButton Content="도움말 보기" Click="HelpButton_Click"/>
+                </controls:SettingsCard>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </Page>

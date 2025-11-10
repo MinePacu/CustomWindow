@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using Windows.UI;
 
 namespace CustomWindow.Utility;
@@ -12,6 +14,12 @@ public static class WindowStyleApplier
 {
     private static ObservableConfig? _config;
     private static bool _isEnabled;
+    
+    // 캡션 색상 적용 제외 대상 프로세스 목록
+    private static readonly HashSet<string> _captionColorExcludedProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "explorer" // 파일 탐색기 (탭 배경이 캡션으로 인식되는 문제 방지)
+    };
 
     /// <summary>
     /// WindowStyleApplier를 초기화하고 시작합니다.
@@ -75,12 +83,72 @@ public static class WindowStyleApplier
 
             // 2. 캡션 텍스트 색상 모드 적용
             ApplyCaptionTextMode(hwnd);
+            
+            // 3. 창 모서리 스타일 적용 (Windows 11+)
+            ApplyCornerMode(hwnd);
 
             // 참고: 테두리 색상은 BorderService에서 처리하므로 여기서는 제외
         }
         catch (Exception ex)
         {
             WindowTracker.AddExternalLog($"ApplyStylesToWindow failed for hwnd=0x{handle.ToInt64():X}: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 창의 프로세스 이름을 가져옵니다.
+    /// </summary>
+    private static string? GetProcessNameForWindow(IntPtr hwnd)
+    {
+        try
+        {
+            GetWindowThreadProcessId(hwnd, out uint processId);
+            if (processId == 0) return null;
+            
+            var process = System.Diagnostics.Process.GetProcessById((int)processId);
+            return process?.ProcessName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// 창이 캡션 색상 적용 제외 대상인지 확인합니다.
+    /// </summary>
+    private static bool IsCaptionColorExcluded(IntPtr hwnd)
+    {
+        var processName = GetProcessNameForWindow(hwnd);
+        if (string.IsNullOrEmpty(processName))
+            return false;
+            
+        return _captionColorExcludedProcesses.Contains(processName);
+    }
+    
+    /// <summary>
+    /// 창 모서리 스타일을 적용합니다. (Windows 11+ 전용)
+    /// </summary>
+    private static void ApplyCornerMode(IntPtr hwnd)
+    {
+        if (_config == null)
+            return;
+            
+        // Windows 11 이상에서만 작동
+        if (!DwmWindowManager.SupportsCustomCaptionColors())
+            return;
+            
+        try
+        {
+            var cornerMode = _config.WindowCornerMode;
+            if (DwmWindowManager.SetCornerPreference(hwnd, cornerMode))
+            {
+                WindowTracker.AddExternalLog($"Applied corner style '{cornerMode ?? "기본"}' to window 0x{hwnd.ToInt64():X}");
+            }
+        }
+        catch (Exception ex)
+        {
+            WindowTracker.AddExternalLog($"ApplyCornerMode failed: {ex.Message}");
         }
     }
 
@@ -91,6 +159,13 @@ public static class WindowStyleApplier
     {
         if (_config == null)
             return;
+        
+        // 파일 탐색기 등 제외 대상인 경우 캡션 색상 적용 건너뛰기
+        if (IsCaptionColorExcluded(hwnd))
+        {
+            WindowTracker.AddExternalLog($"Skipped caption color for excluded process (hwnd=0x{hwnd.ToInt64():X})");
+            return;
+        }
 
         var mode = DwmWindowManager.ParseCaptionMode(_config.CaptionColorMode);
         Color? customCaptionColor = null;
@@ -101,7 +176,7 @@ public static class WindowStyleApplier
             // 커스텀 모드: ColorSettingsViewModel에서 캡션 색상 가져오기
             customCaptionColor = HexToColor(_config.CaptionColor, Color.FromArgb(0xFF, 0x20, 0x20, 0x20));
             
-            // 캡션 텍스트 색상 모드가 커스텀이면 해당 색상 사용, 아니면 자동 대비 색상
+            // 캡션 텍스트 색상 모드가 커스텀이라면 해당 색상 사용, 아니면 자동 대비 색상
             var textMode = DwmWindowManager.ParseCaptionMode(_config.CaptionTextColorMode);
             if (textMode == DwmWindowManager.CaptionMode.Custom)
             {
@@ -121,8 +196,12 @@ public static class WindowStyleApplier
     {
         if (_config == null)
             return;
+        
+        // 파일 탐색기 등 제외 대상인 경우 건너뛰기
+        if (IsCaptionColorExcluded(hwnd))
+            return;
 
-        // 캡션 색상 모드가 커스텀이 아닌 경우에만 텍스트 색상 독립 적용
+        // 캡션 색상 모드가 커스텀이라면 텍스트 색상은 ApplyCaptionMode에서 이미 처리됨
         var captionMode = DwmWindowManager.ParseCaptionMode(_config.CaptionColorMode);
         if (captionMode == DwmWindowManager.CaptionMode.Custom)
         {
@@ -198,4 +277,11 @@ public static class WindowStyleApplier
             WindowTracker.AddExternalLog($"RefreshAllWindows error: {ex.Message}");
         }
     }
+    
+    #region Win32 API
+    
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    
+    #endregion
 }
