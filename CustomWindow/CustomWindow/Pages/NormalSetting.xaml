@@ -180,7 +180,7 @@
                             Header="렌더 방식"
                             Description="테두리 렌더링 방법 선택 (Auto 권장)">
                             <controls:SettingsCard.HeaderIcon>
-                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9A2;"/>
+                                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE950;"/>
                             </controls:SettingsCard.HeaderIcon>
                             <ComboBox SelectedItem="{x:Bind ViewModel.BorderRenderMode, Mode=TwoWay}" MinWidth="120">
                                 <x:String>Auto</x:String>
