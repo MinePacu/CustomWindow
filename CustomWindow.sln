@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomWindow", "CustomWindo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomWindow.Tests", "CustomWindow\CustomWindow.Tests\CustomWindow.Tests.csproj", "{74FDA886-7483-573B-2724-0E61D09CA368}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BorderServiceWinRT", "CustomWindow\BorderService_test_winrt2\BorderService_test_winrt2\BorderService_test_winrt2.vcxproj", "{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BorderService_test_winrt2", "CustomWindow\BorderService_test_winrt2\BorderService_test_winrt2\BorderService_test_winrt2.vcxproj", "{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,8 +41,8 @@ Global
 		{B4F5E2DA-8BA3-43AD-BCF6-7ED80A8244F9}.Release|x86.Deploy.0 = Release|x86
 		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|ARM64.ActiveCfg = Debug|ARM64
 		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|ARM64.Build.0 = Debug|ARM64
-		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x64.ActiveCfg = Debug|x64
-		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x64.Build.0 = Debug|x64
+		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x64.ActiveCfg = Release|x64
+		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x64.Build.0 = Release|x64
 		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x86.ActiveCfg = Debug|x86
 		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Debug|x86.Build.0 = Debug|x86
 		{63312EB2-2C23-4FEB-93EC-F4ADCC96BCF2}.Release|ARM64.ActiveCfg = Release|ARM64
@@ -65,8 +65,8 @@ Global
 		{74FDA886-7483-573B-2724-0E61D09CA368}.Release|x86.Build.0 = Release|Any CPU
 		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|ARM64.ActiveCfg = Debug|x64
 		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|ARM64.Build.0 = Debug|x64
-		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x64.ActiveCfg = Debug|x64
-		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x64.Build.0 = Debug|x64
+		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x64.ActiveCfg = Release|x64
+		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x64.Build.0 = Release|x64
 		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x86.ActiveCfg = Debug|Win32
 		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Debug|x86.Build.0 = Debug|Win32
 		{CCDDD430-CEB5-4AE8-9AD1-E229C636E7CC}.Release|ARM64.ActiveCfg = Release|x64
