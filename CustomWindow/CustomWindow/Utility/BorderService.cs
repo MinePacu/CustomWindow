@@ -37,6 +37,9 @@ public static class BorderService
     private const uint SMTO_ABORTIFHUNG = 0x0002;
     private const string OverlayWindowClass = "BorderOverlayDCompWindowClass";
 
+    // 재시작 플래그: 재시작 중일 때는 UpdateThickness/UpdateColor 무시
+    private static bool _isRestarting = false;
+
     // 로그 이벤트
     public static event Action<string>? LogReceived;
 
@@ -226,20 +229,27 @@ public static class BorderService
     {
         lock (_sync)
         {
+            // 재시작 중이면 무시 (재시작 완료 후 자동 적용됨)
+            if (_isRestarting)
+            {
+                LogMessage($"Ignoring color update during restart (will be applied after restart)");
+                return;
+            }
+
             _lastColor = string.IsNullOrWhiteSpace(borderColorHex) ? _lastColor : borderColorHex.Trim();
 
             // EXE 또는 외부 오버레이가 있으면 IPC 우선
             if (OverlayAvailable)
             {
-                if (TrySendSettingsToOverlay(_lastColor, GetCurrentThicknessOrDefault()))
+                if (TrySendSettingsToOverlay(_lastColor, _lastThickness))
                 {
                     LogMessage($"Applied color via IPC -> {_lastColor}");
                     return;
                 }
-                LogMessage($"IPC failed - attempting EXE restart for color change -> {_lastColor}");
+                LogMessage($"IPC failed for color change -> {_lastColor}");
                 if (IsExeModeRunning)
                 {
-                    RestartWinRTConsoleForSettingsUpdate(_lastColor, GetCurrentThicknessOrDefault(), exePath: null, showConsole: _lastShowConsole);
+                    RestartWinRTConsoleForSettingsUpdate(_lastColor, _lastThickness, exePath: null, showConsole: _lastShowConsole);
                     return;
                 }
             }
@@ -251,20 +261,27 @@ public static class BorderService
     {
         lock (_sync)
         {
+            // 재시작 중이면 무시 (재시작 완료 후 자동 적용됨)
+            if (_isRestarting)
+            {
+                LogMessage($"Ignoring thickness update during restart (will be applied after restart)");
+                return;
+            }
+
             _lastThickness = thickness;
 
             // EXE 또는 외부 오버레이가 있으면 IPC 우선
             if (OverlayAvailable)
             {
-                if (TrySendSettingsToOverlay(GetCurrentColorOrDefault(), thickness))
+                if (TrySendSettingsToOverlay(_lastColor, thickness))
                 {
                     LogMessage($"Applied thickness via IPC -> {thickness}");
                     return;
                 }
-                LogMessage($"IPC failed - attempting EXE restart for thickness change -> {thickness}");
+                LogMessage($"IPC failed for thickness change -> {thickness}");
                 if (IsExeModeRunning)
                 {
-                    RestartWinRTConsoleForSettingsUpdate(GetCurrentColorOrDefault(), thickness, exePath: null, showConsole: _lastShowConsole);
+                    RestartWinRTConsoleForSettingsUpdate(_lastColor, thickness, exePath: null, showConsole: _lastShowConsole);
                     return;
                 }
             }
@@ -494,11 +511,10 @@ public static class BorderService
             hwnd = WaitForOverlayWindowReady();
         }
         if (hwnd == IntPtr.Zero) return false;
-        var prevColor = _lastColor; var prevThick = _lastThickness;
-        _lastColor = string.IsNullOrWhiteSpace(colorHex) ? _lastColor : colorHex;
-        _lastThickness = thickness;
+        
+        // 설정 메시지 전송 (이전 값 백업 제거 - _lastColor와 _lastThickness는 이미 업데이트됨)
         var ok = TrySendCopyData(hwnd, BuildSettingsMessage());
-        if (!ok) { _lastColor = prevColor; _lastThickness = prevThick; }
+        
         return ok;
     }
 
@@ -597,16 +613,36 @@ public static class BorderService
     {
         try
         {
+            _isRestarting = true;
+            LogMessage($"Restarting BorderService with Color={borderColorHex}, Thickness={thickness}, Console={showConsole}");
+
             if (_winrtProc != null && !_winrtProc.HasExited)
             {
                 _winrtProc.Kill(entireProcessTree: true);
                 _winrtProc.WaitForExit(1000);
             }
         }
-        catch { }
-        _winrtProc = null;
-        _running = false;
-        StartWinRTConsole(borderColorHex, thickness, exePath, showConsole);
+        catch (Exception ex)
+        {
+            LogMessage($"Error during restart cleanup: {ex.Message}");
+        }
+        finally
+        {
+            _winrtProc = null;
+            _running = false;
+        }
+
+        // 재시작 플래그를 설정한 상태에서 StartWinRTConsole 호출
+        // StartWinRTConsole이 완료되면 _isRestarting을 false로 설정
+        try
+        {
+            StartWinRTConsole(borderColorHex, thickness, exePath, showConsole);
+        }
+        finally
+        {
+            _isRestarting = false;
+            LogMessage("Restart completed");
+        }
     }
 
     private static void StopWinRTConsoleIfRunning()

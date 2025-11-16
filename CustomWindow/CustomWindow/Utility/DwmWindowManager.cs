@@ -5,7 +5,7 @@ using Windows.UI;
 namespace CustomWindow.Utility;
 
 /// <summary>
-/// DWM(Desktop Window Manager) API를 사용하여 창의 속성을 관리하는 클래스
+/// DWM(Desktop Window Manager) API를 사용하여 창의 속성을 설정하는 클래스
 /// </summary>
 public static class DwmWindowManager
 {
@@ -14,12 +14,16 @@ public static class DwmWindowManager
     private const int DWMWA_BORDER_COLOR = 34;
     private const int DWMWA_CAPTION_COLOR = 35;
     private const int DWMWA_TEXT_COLOR = 36;
+    
+    // 기본 색상 복원을 위한 특수 값
+    private const int DWMWA_COLOR_DEFAULT = unchecked((int)0xFFFFFFFF);
+    private const int DWMWA_COLOR_NONE = unchecked((int)0xFFFFFFFE);
 
     // 캡션 색상 모드 정의
     public enum CaptionMode
     {
-        Light,      // 밝은 모드
-        Dark,       // 어두운 모드
+        Light,      // 밝은 테마
+        Dark,       // 어두운 테마
         Custom      // 커스텀 색상
     }
 
@@ -33,30 +37,36 @@ public static class DwmWindowManager
             switch (mode)
             {
                 case CaptionMode.Light:
-                    // 밝은 모드: DWMWA_USE_IMMERSIVE_DARK_MODE를 FALSE로 설정
-                    // 밝은 배경 + 어두운 텍스트
+                    // 밝은 테마: 이전 Custom 설정 초기화 후 Light 모드 적용
+                    // 1. Custom 색상 초기화 (시스템 기본값으로)
+                    ResetCaptionColors(hwnd);
+                    
+                    // 2. Dark Mode OFF
                     bool lightResult = SetDarkMode(hwnd, false);
-                    // 밝은 모드에서는 검은색 텍스트로 대비
-                    lightResult &= SetTextColor(hwnd, Color.FromArgb(255, 0, 0, 0));
+                    
+                    WindowTracker.AddExternalLog($"Applied Light mode to hwnd=0x{hwnd.ToInt64():X}");
                     return lightResult;
 
                 case CaptionMode.Dark:
-                    // 어두운 모드: DWMWA_USE_IMMERSIVE_DARK_MODE를 TRUE로 설정
-                    // 어두운 배경 + 밝은 텍스트
+                    // 어두운 테마: 이전 Custom 설정 초기화 후 Dark 모드 적용
+                    // 1. Custom 색상 초기화 (시스템 기본값으로)
+                    ResetCaptionColors(hwnd);
+                    
+                    // 2. Dark Mode ON
                     bool darkResult = SetDarkMode(hwnd, true);
-                    // 어두운 모드에서는 흰색 텍스트로 대비
-                    darkResult &= SetTextColor(hwnd, Color.FromArgb(255, 255, 255, 255));
+                    
+                    WindowTracker.AddExternalLog($"Applied Dark mode to hwnd=0x{hwnd.ToInt64():X}");
                     return darkResult;
 
                 case CaptionMode.Custom:
-                    // 커스텀 모드: 사용자 지정 색상 적용
+                    // 커스텀 모드: 명시적 색상 설정
                     bool result = true;
                     
                     if (customCaptionColor.HasValue)
                     {
                         result &= SetCaptionColor(hwnd, customCaptionColor.Value);
                         
-                        // 텍스트 색상이 명시적으로 지정되지 않은 경우, 자동으로 대비되는 색상 선택
+                        // 텍스트 색상이 지정되지 않았으면 대비되는 색상 자동 선택
                         if (!customTextColor.HasValue)
                         {
                             var contrastColor = GetContrastColor(customCaptionColor.Value);
@@ -73,6 +83,7 @@ public static class DwmWindowManager
                         result &= SetTextColor(hwnd, customTextColor.Value);
                     }
                     
+                    WindowTracker.AddExternalLog($"Applied Custom mode to hwnd=0x{hwnd.ToInt64():X}");
                     return result;
 
                 default:
@@ -88,11 +99,50 @@ public static class DwmWindowManager
     }
 
     /// <summary>
-    /// 주어진 배경 색상에 대해 대비되는 텍스트 색상을 반환합니다.
+    /// 캡션 및 텍스트 색상을 시스템 기본값으로 초기화합니다.
+    /// Custom 모드에서 Light/Dark 모드로 전환할 때 사용됩니다.
+    /// </summary>
+    private static bool ResetCaptionColors(IntPtr hwnd)
+    {
+        try
+        {
+            bool result = true;
+            
+            // DWMWA_COLOR_DEFAULT (0xFFFFFFFF)를 사용하여 시스템 기본값으로 복원
+            int defaultColor = DWMWA_COLOR_DEFAULT;
+            
+            // 캡션 색상 초기화
+            int captionResult = DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref defaultColor, sizeof(int));
+            if (captionResult != 0)
+            {
+                WindowTracker.AddExternalLog($"ResetCaptionColor warning: HRESULT=0x{captionResult:X}");
+                result = false;
+            }
+            
+            // 텍스트 색상 초기화
+            int textResult = DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, ref defaultColor, sizeof(int));
+            if (textResult != 0)
+            {
+                WindowTracker.AddExternalLog($"ResetTextColor warning: HRESULT=0x{textResult:X}");
+                result = false;
+            }
+            
+            WindowTracker.AddExternalLog($"Reset caption colors to system default for hwnd=0x{hwnd.ToInt64():X}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            WindowTracker.AddExternalLog($"ResetCaptionColors exception: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 주어진 배경 색상에 대비되는 텍스트 색상을 반환합니다.
     /// </summary>
     private static Color GetContrastColor(Color backgroundColor)
     {
-        // 상대 휘도(Relative Luminance) 계산 (WCAG 2.0 기준)
+        // 상대 휘도(Relative Luminance) 계산 (WCAG 2.0 표준)
         // L = 0.2126 * R + 0.7152 * G + 0.0722 * B
         double r = backgroundColor.R / 255.0;
         double g = backgroundColor.G / 255.0;
@@ -107,7 +157,7 @@ public static class DwmWindowManager
         double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
         // 휘도가 0.5보다 크면 어두운 배경이므로 밝은 텍스트, 작으면 밝은 배경이므로 어두운 텍스트
-        // 임계값을 0.5로 설정 (조정 가능)
+        // 임계값은 0.5로 설정 (조정 가능)
         if (luminance > 0.5)
         {
             // 밝은 배경 -> 검은색 텍스트
@@ -224,7 +274,7 @@ public static class DwmWindowManager
     }
 
     /// <summary>
-    /// 문자열로 지정된 캡션 모드를 열거형으로 변환합니다.
+    /// 문자열을 기반으로 캡션 모드를 열거형으로 변환합니다.
     /// </summary>
     public static CaptionMode ParseCaptionMode(string? mode)
     {
@@ -252,11 +302,11 @@ public static class DwmWindowManager
     /// 창의 모서리 스타일을 설정합니다. (Windows 11+ 전용)
     /// </summary>
     /// <param name="hwnd">대상 창 핸들</param>
-    /// <param name="cornerMode">모서리 모드: "기본", "둥글게 하지 않음", "둥글게", "덜 둥글게"</param>
+    /// <param name="cornerMode">모서리 모드: "기본", "둥글게 안 함", "둥글게", "작게 둥글게"</param>
     /// <returns>성공 여부</returns>
     public static bool SetCornerPreference(IntPtr hwnd, string? cornerMode)
     {
-        // Windows 11 전용 기능
+        // Windows 11 이상 확인
         if (!IsWindows11OrGreater())
         {
             WindowTracker.AddExternalLog($"[Win10] SetCornerPreference is only supported on Windows 11+");
@@ -268,15 +318,15 @@ public static class DwmWindowManager
             // DWMWCP (DWM Window Corner Preference) 값
             const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
             const int DWMWCP_DEFAULT = 0;           // 기본 (시스템 설정 따름)
-            const int DWMWCP_DONOTROUND = 1;        // 둥글게 하지 않음
+            const int DWMWCP_DONOTROUND = 1;        // 둥글게 안 함
             const int DWMWCP_ROUND = 2;             // 둥글게
-            const int DWMWCP_ROUNDSMALL = 3;        // 덜 둥글게
+            const int DWMWCP_ROUNDSMALL = 3;        // 작게 둥글게
 
             int preference = cornerMode?.Trim() switch
             {
-                "둥글게 하지 않음" => DWMWCP_DONOTROUND,
+                "둥글게 안 함" => DWMWCP_DONOTROUND,
                 "둥글게" => DWMWCP_ROUND,
-                "덜 둥글게" => DWMWCP_ROUNDSMALL,
+                "작게 둥글게" => DWMWCP_ROUNDSMALL,
                 "기본" or null or "" => DWMWCP_DEFAULT,
                 _ => DWMWCP_DEFAULT
             };

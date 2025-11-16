@@ -13,6 +13,9 @@
     <!-- 테스트에 필요한 파일만 직접 포함 (WinUI 프로젝트 전체 빌드 회피) -->
     <Compile Include="..\CustomWindow\Utility\WindowHighlighter.cs" Link="Utility\WindowHighlighter.cs" />
     <Compile Include="WindowHighlighterTests.cs" />
+    <Compile Include="BorderServicePerformanceTests.cs" />
+    <Compile Include="BorderServiceAdvancedPerformanceTests.cs" />
+    <Compile Include="PerformanceResultExporter.cs" />
   </ItemGroup>
 
   <ItemGroup>

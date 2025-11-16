@@ -15,10 +15,13 @@ public static class WindowStyleApplier
     private static ObservableConfig? _config;
     private static bool _isEnabled;
     
-    // 캡션 색상 적용 제외 대상 프로세스 목록
+    // 캡션 색상 모드 설정 제외 대상 프로세스 목록
     private static readonly HashSet<string> _captionColorExcludedProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
-        "explorer" // 파일 탐색기 (탭 배경이 캡션으로 인식되는 문제 방지)
+        "explorer", // 파일 탐색기 (창 제목이 캡션으로 인식되는 경우 제외)
+        "BorderService_test_winrt2", // BorderService 자체 프로세스 제외
+        "BorderService_Test_winrt", // BorderService 구버전 제외
+        "BorderServiceWinRT" // BorderService 실행 파일 제외
     };
 
     /// <summary>
