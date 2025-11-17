@@ -13,8 +13,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # --- 핵심 수정 부분 ---
-    # Visual Studio 설치 관리자를 사용하여 필요한 컴포넌트를 직접 설치합니다.
     - name: Add MSVC and Windows SDK components
       run: |
         & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
@@ -27,11 +25,21 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    # --- 핵심 수정 부분 (1) ---
+    # Restore 단계에도 WindowsSDKVersion을 지정하여 일관성을 유지합니다.
     - name: Restore NuGet packages
-      run: msbuild -t:restore CustomWindow.sln
+      run: msbuild -t:restore CustomWindow.sln -p:WindowsSDKVersion=10.0.22621.0
 
+    # --- 핵심 수정 부분 (2) ---
+    # Build 단계에 '/p:WindowsSDKVersion=10.0.22621.0' 속성을 명시적으로 전달합니다.
+    # 이렇게 하면 프로젝트 파일 설정을 무시하고 설치된 SDK를 강제로 사용하게 됩니다.
     - name: Build Solution
-      run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
+      run: >
+        msbuild CustomWindow.sln
+        -p:Configuration=Release
+        -p:Platform=x64
+        -p:PublishReadyToRun=false
+        -p:WindowsSDKVersion=10.0.22621.0
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
