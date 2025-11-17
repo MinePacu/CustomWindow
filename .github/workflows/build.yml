@@ -82,10 +82,30 @@ jobs:
     - name: Build Solution
       run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
 
-    - name: Upload build artifacts
-      # 빌드 결과물 경로를 좀 더 일반적인 솔루션 레벨의 출력 경로로 변경합니다.
-      # 패키징 프로젝트(.wapproj)의 결과물은 AppPackages 폴더에 생성될 가능성이 높습니다.
+    - name: Copy C++ executable to .NET output directory
+      run: |
+        # C# 프로젝트의 출력 폴더 경로를 찾습니다. (와일드카드 사용)
+        $destDir = (Resolve-Path -Path "CustomWindow/CustomWindow/bin/x64/Release/net*/win10*").Path
+        
+        # C++ 프로젝트의 실행 파일 경로를 지정합니다.
+        $sourceFile = "CustomWindow/BorderService_test_winrt2/x64/Release/BorderService_test_winrt2.exe"
+        
+        # 파일을 복사합니다.
+        Copy-Item -Path $sourceFile -Destination $destDir
+        
+        # 확인을 위해 로그를 출력합니다.
+        echo "Copied $sourceFile to $destDir"
+      shell: pwsh
+
+    - name: Upload Packaged App Artifacts (Installer)
       uses: actions/upload-artifact@v4
       with:
-        name: windows-build-artifacts
+        name: packaged-app-artifacts
         path: CustomWindow/CustomWindow (Package)/AppPackages/
+
+    - name: Upload Unpackaged App Artifacts (Executable)
+      uses: actions/upload-artifact@v4
+      with:
+        name: unpackaged-app-artifacts
+        # 이제 이 경로에는 C# 앱과 C++ 앱이 모두 포함되어 있습니다.
+        path: CustomWindow/CustomWindow/bin/x64/Release/net*/win10*/
