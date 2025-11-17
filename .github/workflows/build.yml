@@ -89,8 +89,8 @@ jobs:
         
     - name: Copy C++ executable to .NET output directory
       run: |
-        # C# 프로젝트의 출력 폴더 경로를 찾습니다. (와일드카드 사용)
-        $destDir = (Resolve-Path -Path "CustomWindow/CustomWindow/bin/x64/Release/net*/win10*").Path
+        # C# 프로젝트의 출력 폴더 경로를 찾습니다.
+        $destDir = (Resolve-Path -Path "CustomWindow/CustomWindow/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64").Path
         
         # C++ 프로젝트의 실행 파일 경로를 지정합니다.
         $sourceFile = "x64/Release/BorderService_test_winrt2.exe"
