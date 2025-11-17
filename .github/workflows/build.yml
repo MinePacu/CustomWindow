@@ -28,7 +28,7 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Restore NuGet packages
-      run: msbuild -t:restore CustomWindow.sln
+      run: nuget restore CustomWindow.sln
 
     # --- 핵심 수정 부분 (2) ---
     # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
