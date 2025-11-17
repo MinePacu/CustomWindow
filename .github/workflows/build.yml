@@ -31,7 +31,7 @@ jobs:
           --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
           --add Microsoft.VisualStudio.Workload.NativeDesktop `
           --add Microsoft.VisualStudio.Component.Windows11SDK.22621 `
-          --wait --quiet --norestart
+          --wait
       shell: pwsh
       
     - name: Setup MSBuild
