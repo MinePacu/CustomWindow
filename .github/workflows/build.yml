@@ -15,10 +15,10 @@ jobs:
 
     # --- 핵심 수정 부분 (1) ---
     # C++ 프로젝트(MSB8036)에 필요한 특정 Windows SDK 설치
-    # - name: Install specific Windows SDK
-    #  run: |
-    #    Add-WindowsCapability -Online -Name "Tools.Development.Desktop.Sdk.10.0.22621"
-    #  shell: pwsh
+    - name: Install specific Windows SDK
+      run: |
+        Add-WindowsCapability -Online -Name "Tools.Development.Desktop.Sdk.10.0.26100.0"
+      shell: pwsh
 
     # - name: Setup MSVC environment
     #  shell: cmd
