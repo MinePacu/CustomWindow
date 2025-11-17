@@ -33,7 +33,7 @@ jobs:
     - name: Debug paths – print subfolders recursively
       run: |
         echo "== Full Directory Tree =="
-        dir /s "${{ github.workspace }}"
+        dir "${{ github.workspace }}" /s
 
     - name: Debug paths – check project folder
       run: |
@@ -44,7 +44,7 @@ jobs:
       run: |
         echo "== packages (root) =="
         if exist "${{ github.workspace }}\packages" (
-          dir /s "${{ github.workspace }}\packages"
+          dir "${{ github.workspace }}\packages" /s
         ) else (
           echo "packages folder does NOT exist in repo root"
         )
@@ -53,7 +53,7 @@ jobs:
       run: |
         echo "== packages (solution folder) =="
         if exist "${{ github.workspace }}\CustomWindow\packages" (
-          dir /s "${{ github.workspace }}\CustomWindow\packages"
+          dir "${{ github.workspace }}\CustomWindow\packages" /s
         ) else (
           echo "packages folder does NOT exist in solution folder"
         )
@@ -62,7 +62,7 @@ jobs:
       run: |
         echo "== packages (project-level) =="
         if exist "${{ github.workspace }}\CustomWindow\BorderService_test_winrt2\packages" (
-          dir /s "${{ github.workspace }}\CustomWindow\BorderService_test_winrt2\packages"
+          dir "${{ github.workspace }}\CustomWindow\BorderService_test_winrt2\packages" /s
         ) else (
           echo "packages folder does NOT exist next to project (..\\packages)"
         )
@@ -71,7 +71,7 @@ jobs:
       run: |
         echo "== Checking for Microsoft.Windows.CppWinRT.2.0.220531.1 =="
         echo "Searching..."
-        dir /s "${{ github.workspace }}" | findstr /i "Microsoft.Windows.CppWinRT"
+        dir "${{ github.workspace }}" /s | findstr /i "Microsoft.Windows.CppWinRT"
 
     - name: Restore NuGet packages
       working-directory: CustomWindow          
