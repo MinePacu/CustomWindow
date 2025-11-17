@@ -15,6 +15,7 @@ jobs:
       
     - name: Install dependencies
       run: dotnet add BorderService_test_winrt2 package Microsoft.Windows.CppWinRT --version 2.0.220531.1
+      working-directory: ./CustomWindow/BorderService_test_winrt2/BorderService_test_winrt2
 
     # - name: Setup MSVC environment
     #  shell: cmd
