@@ -1,0 +1,33 @@
+name: Build CustomWindow on Windows
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: msbuild -t:restore CustomWindow.sln
+
+      - name: Build Solution (Release x64)
+        run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64
+
+      - name: Collect build artifacts
+        # 빌드 산출물 경로는 프로젝트 설정에 따라 달라집니다.
+        # 필요시 경로를 실제 빌드 로그에서 확인하여 수정하세요.
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-artifacts
+          path: |
+            CustomWindow/CustomWindow/bin/x64/Release/
+            CustomWindow/CustomWindow/bin/Release/
