@@ -74,9 +74,8 @@ jobs:
           Where-Object { $_.FullName -match "Microsoft.Windows.CppWinRT" } |
           Select-Object FullName
 
-    - name: Restore NuGet packages
-      working-directory: CustomWindow          
-      run: nuget restore CustomWindow.sln -PackagesDirectory packages
+    - name: Restore NuGet packages   
+      run: nuget restore CustomWindow.sln -PackagesDirectory CustomWindow/BorderService_test_winrt2/BorderService_test_winrt2/packages
 
     # --- 핵심 수정 부분 (2) ---
     # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
