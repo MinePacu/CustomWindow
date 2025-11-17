@@ -93,7 +93,7 @@ jobs:
         $destDir = (Resolve-Path -Path "CustomWindow/CustomWindow/bin/x64/Release/net*/win10*").Path
         
         # C++ 프로젝트의 실행 파일 경로를 지정합니다.
-        $sourceFile = "CustomWindow/BorderService_test_winrt2/x64/Release/BorderService_test_winrt2.exe"
+        $sourceFile = "CustomWindow/x64/Release/BorderService_test_winrt2.exe"
         
         # 파일을 복사합니다.
         Copy-Item -Path $sourceFile -Destination $destDir
