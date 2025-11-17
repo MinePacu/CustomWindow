@@ -13,25 +13,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Add MSVC and Windows SDK components
+    # --- 핵심 수정 부분 (1) ---
+    # C++ 프로젝트(MSB8036)에 필요한 특정 Windows SDK 설치
+    # - name: Install specific Windows SDK
+    #  run: |
+    #    Add-WindowsCapability -Online -Name "Tools.Development.Desktop.Sdk.10.0.22621"
+    #  shell: pwsh
+
+    - name: Setup MSVC environment
+      shell: cmd
       run: |
-        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" `
-          --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
-          --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-          --add Microsoft.VisualStudio.Component.Windows11SDK.22621 `
-          --wait --quiet --norestart
-      shell: pwsh
-    
-    # --- !!! 최종 핵심 수정 부분 !!! ---
-    # 문제가 되는 C++ 프로젝트 파일(.vcxproj)의 SDK 버전을 동적으로 수정합니다.
-    - name: Force retarget Windows SDK version in project file
-      run: |
-        $vcxprojPath = "D:\a\CustomWindow\CustomWindow\CustomWindow\BorderService_test_winrt2\BorderService_test_winrt2\BorderService_test_winrt2.vcxproj"
-        $content = Get-Content $vcxprojPath
-        $content = $content -replace "<WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>", "<WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>"
-        Set-Content -Path $vcxprojPath -Value $content
-        echo "Successfully retargeted Windows SDK in $vcxprojPath"
-      shell: pwsh
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x64 10.0.22621.0
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -39,14 +31,14 @@ jobs:
     - name: Restore NuGet packages
       run: msbuild -t:restore CustomWindow.sln
 
+    # --- 핵심 수정 부분 (2) ---
+    # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
     - name: Build Solution
-      run: >
-        msbuild CustomWindow.sln
-        -p:Configuration=Release
-        -p:Platform=x64
-        -p:PublishReadyToRun=false
+      run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
 
     - name: Upload build artifacts
+      # 빌드 결과물 경로를 좀 더 일반적인 솔루션 레벨의 출력 경로로 변경합니다.
+      # 패키징 프로젝트(.wapproj)의 결과물은 AppPackages 폴더에 생성될 가능성이 높습니다.
       uses: actions/upload-artifact@v4
       with:
         name: windows-build-artifacts
