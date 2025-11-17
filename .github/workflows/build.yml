@@ -20,11 +20,20 @@ jobs:
     #    Add-WindowsCapability -Online -Name "Tools.Development.Desktop.Sdk.10.0.22621"
     #  shell: pwsh
 
-    - name: Setup MSVC environment
-      shell: cmd
-      run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64 10.0.22621.0
+    # - name: Setup MSVC environment
+    #  shell: cmd
+    #  run: |
+    #    call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64 10.0.22621.0
 
+    - name: Install C++ Desktop Development Workload and specific SDK
+      run: |
+        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
+          --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
+          --add Microsoft.VisualStudio.Workload.NativeDesktop `
+          --add Microsoft.VisualStudio.Component.Windows11SDK.22621 `
+          --wait --quiet --norestart
+      shell: pwsh
+      
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
