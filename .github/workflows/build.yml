@@ -2,7 +2,7 @@ name: Build CustomWindow on Windows
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
@@ -10,24 +10,31 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+    # --- 핵심 수정 부분 (1) ---
+    # C++ 프로젝트(MSB8036)에 필요한 특정 Windows SDK 설치
+    - name: Install specific Windows SDK
+      run: |
+        Add-WindowsCapability -Online -Name "Tools.Development.Desktop.Sdk.10.0.22621"
+      shell: pwsh
 
-      - name: Restore NuGet packages
-        run: msbuild -t:restore CustomWindow.sln
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
 
-      - name: Build Solution (Release x64)
-        run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64
+    - name: Restore NuGet packages
+      run: msbuild -t:restore CustomWindow.sln
 
-      - name: Collect build artifacts
-        # 빌드 산출물 경로는 프로젝트 설정에 따라 달라집니다.
-        # 필요시 경로를 실제 빌드 로그에서 확인하여 수정하세요.
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build-artifacts
-          path: |
-            CustomWindow/CustomWindow/bin/x64/Release/
-            CustomWindow/CustomWindow/bin/Release/
+    # --- 핵심 수정 부분 (2) ---
+    # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
+    - name: Build Solution
+      run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
+
+    - name: Upload build artifacts
+      # 빌드 결과물 경로를 좀 더 일반적인 솔루션 레벨의 출력 경로로 변경합니다.
+      # 패키징 프로젝트(.wapproj)의 결과물은 AppPackages 폴더에 생성될 가능성이 높습니다.
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build-artifacts
+        path: CustomWindow/CustomWindow (Package)/AppPackages/
