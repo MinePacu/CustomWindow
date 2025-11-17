@@ -13,15 +13,8 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Install UWP Workload
-      shell: powershell
-      run: |
-        # Use vswhere to find the VS Installer and install the workload
-        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property productPath | ForEach-Object {
-          $installerPath = Join-Path $_ "..\Installer\vs_installer.exe"
-          & $installerPath modify --installPath $_ --add Microsoft.VisualStudio.Workload.Windows --passive --norestart
-        }
-
+    - name: Install dependencies
+    - run : dotnet add package Microsoft.Windows.CppWinRT --version 2.0.220531.1
 
     # - name: Setup MSVC environment
     #  shell: cmd
