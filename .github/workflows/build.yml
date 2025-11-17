@@ -85,7 +85,7 @@ jobs:
     - name: Debug paths – print subfolders recursively
       run: |
         echo "== Full Directory Tree =="
-        Get-ChildItem -Path "${{ github.workspace }}" -Recurse
+        Get-ChildItem -Path "CustomWindow/CustomWindow/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64" -Recurse
         
     - name: Copy C++ executable to .NET output directory
       run: |
