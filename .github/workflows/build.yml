@@ -82,6 +82,11 @@ jobs:
     - name: Build Solution
       run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
 
+    - name: Debug paths – print subfolders recursively
+      run: |
+        echo "== Full Directory Tree =="
+        Get-ChildItem -Path "${{ github.workspace }}" -Recurse
+        
     - name: Copy C++ executable to .NET output directory
       run: |
         # C# 프로젝트의 출력 폴더 경로를 찾습니다. (와일드카드 사용)
