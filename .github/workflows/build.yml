@@ -33,7 +33,7 @@ jobs:
     # --- 핵심 수정 부분 (2) ---
     # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
     - name: Build Solution
-      run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false -p:WindowsTargetPlatformVersion=10.0.26100.0
+      run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
 
     - name: Upload build artifacts
       # 빌드 결과물 경로를 좀 더 일반적인 솔루션 레벨의 출력 경로로 변경합니다.
