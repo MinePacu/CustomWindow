@@ -113,4 +113,4 @@ jobs:
       with:
         name: unpackaged-app-artifacts
         # 이제 이 경로에는 C# 앱과 C++ 앱이 모두 포함되어 있습니다.
-        path: CustomWindow/CustomWindow/bin/x64/Release/net*/win10*/
+        path: CustomWindow/CustomWindow/bin/x64/Release/net8.0-windows10.0.19041.0/win-64/
