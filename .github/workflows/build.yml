@@ -80,7 +80,6 @@ jobs:
     # --- 핵심 수정 부분 (2) ---
     # PublishReadyToRun=false 속성을 추가하여 NETSDK1094 오류 해결
     - name: Build Solution
-      working-directory: CustomWindow 
       run: msbuild CustomWindow.sln -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=false
 
     - name: Upload build artifacts
