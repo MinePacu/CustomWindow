@@ -149,6 +149,13 @@ namespace CustomWindow
             {
                 try
                 {
+                    // 종료 시 기본 설정 복원이 활성화된 경우 창 모서리 복원
+                    if (ConfigStore?.Config.RestoreDefaultsOnExit == true)
+                    {
+                        RestoreWindowCornersOnExit();
+                        WindowTracker.AddExternalLog("App exit: 창 모서리 기본 상태로 복원");
+                    }
+                    
                     BorderService.StopIfRunning();
                     WindowStyleApplier.Stop();
                     WindowTracker.Stop();
@@ -165,6 +172,13 @@ namespace CustomWindow
                 {
                     if (ConfigStore?.Config.MinimizeToTray != true)
                     {
+                        // 창 닫기 시에도 기본 설정 복원
+                        if (ConfigStore?.Config.RestoreDefaultsOnExit == true)
+                        {
+                            RestoreWindowCornersOnExit();
+                            WindowTracker.AddExternalLog("Window closed: 창 모서리 기본 상태로 복원");
+                        }
+                        
                         BorderService.StopIfRunning();
                         WindowStyleApplier.Stop();
                         WindowTracker.Stop();
@@ -177,5 +191,50 @@ namespace CustomWindow
 
         // Window에 접근할 수 있도록 public 속성 추가
         public Window? Window => _window;
+
+        /// <summary>
+        /// 애플리케이션 종료 시 모든 창의 모서리를 기본 상태로 복원합니다.
+        /// </summary>
+        private static void RestoreWindowCornersOnExit()
+        {
+            // Windows 11 이상에서만 작동
+            if (!DwmWindowManager.SupportsCustomCaptionColors())
+            {
+                return;
+            }
+
+            try
+            {
+                // WindowTracker에서 현재 추적 중인 창 목록 가져오기
+                var windows = WindowTracker.CurrentWindowHandles;
+                if (windows == null || windows.Count == 0)
+                {
+                    return;
+                }
+
+                int successCount = 0;
+                foreach (var handle in windows)
+                {
+                    try
+                    {
+                        // "기본" 모드로 설정하여 시스템 기본 동작으로 복원
+                        if (DwmWindowManager.SetCornerPreference((IntPtr)handle, "기본"))
+                        {
+                            successCount++;
+                        }
+                    }
+                    catch
+                    {
+                        // 종료 시에는 조용히 실패 처리
+                    }
+                }
+
+                WindowTracker.AddExternalLog($"종료 시 창 모서리 복원: {successCount}/{windows.Count}개 창");
+            }
+            catch
+            {
+                // 종료 시에는 조용히 실패 처리
+            }
+        }
     }
 }

@@ -224,6 +224,56 @@ public static class BorderService
         }
     }
 
+    private static void StopWinRTConsoleIfRunning()
+    {
+        try
+        {
+            if (_winrtProc != null && !_winrtProc.HasExited)
+            {
+                // Try graceful shutdown via IPC first
+                LogMessage("Attempting graceful shutdown via IPC...");
+                var hwnd = FindOverlayWindow();
+                if (hwnd != IntPtr.Zero)
+                {
+                    if (TrySendCopyData(hwnd, "QUIT"))
+                    {
+                        LogMessage("Sent QUIT command via IPC, waiting for process to exit...");
+                        if (_winrtProc.WaitForExit(2000))
+                        {
+                            LogMessage("Process exited gracefully");
+                            _winrtProc = null;
+                            _running = false;
+                            return;
+                        }
+                        LogMessage("Process did not exit within timeout, forcing termination...");
+                    }
+                    else
+                    {
+                        LogMessage("Failed to send QUIT command, forcing termination...");
+                    }
+                }
+                else
+                {
+                    LogMessage("Overlay window not found, forcing termination...");
+                }
+
+                // Force kill if graceful shutdown failed
+                _winrtProc.Kill(entireProcessTree: true);
+                _winrtProc.WaitForExit(2000);
+                LogMessage("Process forcefully terminated");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"Error during process termination: {ex.Message}");
+        }
+        finally 
+        { 
+            _winrtProc = null; 
+            _running = false; 
+        }
+    }
+
     /// <summary>색상 업데이트</summary>
     public static void UpdateColor(string borderColorHex)
     {
@@ -643,20 +693,6 @@ public static class BorderService
             _isRestarting = false;
             LogMessage("Restart completed");
         }
-    }
-
-    private static void StopWinRTConsoleIfRunning()
-    {
-        try
-        {
-            if (_winrtProc != null && !_winrtProc.HasExited)
-            {
-                _winrtProc.Kill(entireProcessTree: true);
-                _winrtProc.WaitForExit(2000);
-            }
-        }
-        catch { }
-        finally { _winrtProc = null; _running = false; }
     }
 
     private static string NormalizeColor(string color)

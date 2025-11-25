@@ -16,7 +16,7 @@ public partial class NormalSettingsViewModel : ObservableObject
     public NormalSettingsViewModel(ObservableConfig cfg)
     {
         _config = cfg;
-        // 기본 제외 값 추가 (중복 방지)
+        // 기본 제외 대상 추가 (중복 방지)
         var set = new HashSet<string>(_config.Snapshot.ExcludedPrograms, System.StringComparer.OrdinalIgnoreCase);
         bool added = false;
         foreach (var d in _defaultExcludes)
@@ -53,16 +53,16 @@ public partial class NormalSettingsViewModel : ObservableObject
 
             if (AutoWindowChange)
             {
-                // 재시작하여 즉시 반영
+                // 재시작하여 모드 반영
                 var borderHex = _config.BorderColor ?? "#0078FF";
                 BorderService.StopIfRunning();
                 BorderService.StartIfNeeded(borderHex, _config.BorderThickness, _config.Snapshot.ExcludedPrograms.ToArray());
-                WindowTracker.AddExternalLog($"렌더 방식 변경 -> {_config.BorderRenderMode} (재시작)");
+                WindowTracker.AddExternalLog($"렌더 모드 변경 -> {_config.BorderRenderMode} (재시작)");
             }
         }
     }
 
-    //  상태 텍스트: EXE 모드 요약
+    //  상태 텍스트: EXE 모드 표시
     public string BorderServiceStatusText
     {
         get
@@ -96,13 +96,13 @@ public partial class NormalSettingsViewModel : ObservableObject
                 WindowStyleApplier.Initialize(_config);
                 
                 // BorderService 시작
-                var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 색상
+                var borderHex = _config.BorderColor ?? "#FF0000"; // 기본 빨강
                 int thickness = _config.BorderThickness;
                 BorderService.SetConsoleVisibilityPreference(_config.ShowBorderServiceConsole);
                 BorderService.SetRenderModePreference(_config.BorderRenderMode);
                 BorderService.SetForegroundWindowOnly(_config.ForegroundWindowOnly);
                 
-                // 창 모서리 설정 적용
+                // 창 모서리 모드 설정
                 BorderService.UpdateCornerMode(_config.WindowCornerMode);
                 
                 BorderService.StartIfNeeded(borderHex, thickness, _config.Snapshot.ExcludedPrograms.ToArray());
@@ -111,14 +111,67 @@ public partial class NormalSettingsViewModel : ObservableObject
             }
             else
             {
+                // AutoWindowChange OFF: 서비스 중지 및 원래 상태로 복원
                 BorderService.StopIfRunning();
                 WindowStyleApplier.Stop();
+                
+                // DWM 모드에서 창 모서리를 기본 상태로 복원
+                RestoreWindowCornersToDefault();
+                
                 WindowTracker.Stop();
-                WindowTracker.AddExternalLog("AutoWindowChange OFF: BorderService 중지");
+                WindowTracker.AddExternalLog("AutoWindowChange OFF: BorderService 중지 및 창 설정 복원");
             }
 
             // 상태 갱신
             CheckBorderServiceStatus();
+        }
+    }
+
+    /// <summary>
+    /// 모든 창의 모서리 설정을 기본 상태로 복원합니다.
+    /// AutoWindowChange OFF 시 호출됩니다.
+    /// </summary>
+    private void RestoreWindowCornersToDefault()
+    {
+        // Windows 11 이상에서만 작동
+        if (!DwmWindowManager.SupportsCustomCaptionColors())
+        {
+            WindowTracker.AddExternalLog("Windows 10에서는 창 모서리 복원이 필요하지 않습니다");
+            return;
+        }
+
+        try
+        {
+            // WindowTracker에서 현재 추적 중인 창 목록 가져오기
+            var windows = WindowTracker.CurrentWindowHandles;
+            if (windows == null || windows.Count == 0)
+            {
+                WindowTracker.AddExternalLog("복원할 창이 없습니다");
+                return;
+            }
+
+            int successCount = 0;
+            foreach (var handle in windows)
+            {
+                try
+                {
+                    // "기본" 모드로 설정하여 시스템 기본 동작으로 복원
+                    if (DwmWindowManager.SetCornerPreference((IntPtr)handle, "기본"))
+                    {
+                        successCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WindowTracker.AddExternalLog($"창 0x{handle:X} 모서리 복원 실패: {ex.Message}");
+                }
+            }
+
+            WindowTracker.AddExternalLog($"창 모서리 기본 상태로 복원 완료: {successCount}/{windows.Count}개 창");
+        }
+        catch (Exception ex)
+        {
+            WindowTracker.AddExternalLog($"RestoreWindowCornersToDefault 오류: {ex.Message}");
         }
     }
 
@@ -137,19 +190,21 @@ public partial class NormalSettingsViewModel : ObservableObject
             if (AutoWindowChange)
             {
                 BorderService.SetForegroundWindowOnly(value);
-                WindowTracker.AddExternalLog($"포그라운드 창 전용 모드: {(previousValue ? "활성화" : "비활성화")} -> {(value ? "활성화" : "비활성화")}");
+                var fromState = previousValue ? "ON" : "OFF";
+                var toState = value ? "ON" : "OFF";
+                WindowTracker.AddExternalLog($"Foreground window mode changed: {fromState} -> {toState}");
                 
-                // 상태 변경 후 추가적인 강제 새로고침 (1초 후)
+                // 설정 변경 후 추가적인 창 새로고침 (1초 후)
                 System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
                 {
                     try
                     {
                         BorderService.ForceRedraw();
-                        WindowTracker.AddExternalLog("포그라운드 옵션 변경 후 최종 강제 새로고침 완료");
+                        WindowTracker.AddExternalLog("Window state refreshed after foreground option change");
                     }
                     catch (Exception ex)
                     {
-                        WindowTracker.AddExternalLog($"포그라운드 옵션 변경 후 최종 강제 새로고침 실패: {ex.Message}");
+                        WindowTracker.AddExternalLog($"Failed to refresh window state: {ex.Message}");
                     }
                 }, System.Threading.Tasks.TaskScheduler.Default);
             }
@@ -161,7 +216,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         get => string.Join("\n", _config.Snapshot.ExcludedPrograms);
         set
         {
-            // 중복 제거 처리 (줄 단위)
+            // 중복 제거 처리 (각 라인)
             _config.Snapshot.ExcludedPrograms.Clear();
             var set = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
             if (value != null)
@@ -170,7 +225,7 @@ public partial class NormalSettingsViewModel : ObservableObject
                 {
                     var line = raw.Trim();
                     if (line.Length == 0) continue;
-                    // 전체경로 입력해도 파일명만 사용
+                    // 전체경로 입력해도 파일명만 추출
                     try
                     {
                         line = System.IO.Path.GetFileName(line);
@@ -205,7 +260,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         if (AutoWindowChange)
         {
             var borderHex = _config.BorderColor ?? "#0078FF";
-            BorderService.UpdateColor(borderHex); // EXE 우선으로 반영
+            BorderService.UpdateColor(borderHex); // EXE 선택적으로 반영
             CheckBorderServiceStatus();
         }
     }
@@ -213,7 +268,7 @@ public partial class NormalSettingsViewModel : ObservableObject
     {
         if (AutoWindowChange)
         {
-            BorderService.UpdateThickness(_config.BorderThickness); // EXE 우선으로 반영
+            BorderService.UpdateThickness(_config.BorderThickness); // EXE 선택적으로 반영
             CheckBorderServiceStatus();
         }
     }
@@ -249,10 +304,10 @@ public partial class NormalSettingsViewModel : ObservableObject
             _config.WindowCornerMode = value; 
             OnPropertyChanged();
             
-            // BorderService를 통해 C++ EXE에 전달
+            // BorderService에 전달 (C++ EXE로 전달)
             BorderService.UpdateCornerMode(value);
             
-            // Windows 11에서 즉시 모든 창에 적용
+            // Windows 11에서 현재 열린 창에 적용
             if (DwmWindowManager.SupportsCustomCaptionColors()) // Windows 11+
             {
                 try
@@ -267,7 +322,7 @@ public partial class NormalSettingsViewModel : ObservableObject
             }
             else
             {
-                WindowTracker.AddExternalLog($"창 모서리 스타일 변경: {value ?? "기본"} (Windows 10에서는 지원 안됨)");
+                WindowTracker.AddExternalLog($"창 모서리 스타일 변경: {value ?? "기본"} (Windows 10에서는 적용 안됨)");
             }
         } 
     }
@@ -317,7 +372,7 @@ public partial class NormalSettingsViewModel : ObservableObject
         }
     }
 
-    private bool _autoAdminApplying; // 전환 중
+    private bool _autoAdminApplying; // 순환 방지
     public bool AutoAdmin
     {
         get => _config.AutoAdmin;
@@ -363,11 +418,11 @@ public partial class NormalSettingsViewModel : ObservableObject
             WindowTracker.SetLoggingEnabled(value);
             if (value)
             {
-                WindowTracker.AddExternalLog("자동 변경 추적 로그 활성화");
+                WindowTracker.AddExternalLog("자동 창 설정 로그 활성화");
             }
             else
             {
-                WindowTracker.AddExternalLog("자동 변경 추적 로그 비활성화");
+                WindowTracker.AddExternalLog("자동 창 설정 로그 비활성화");
             }
         } 
     }

@@ -44,6 +44,15 @@ static bool ParseColorString(const std::wstring& hex, D2D1_COLOR_F& out)
 
 static void HandleSettingsMessage(const std::wstring& msg)
 {
+    // Handle QUIT command
+    auto msgUpper = msg;
+    std::transform(msgUpper.begin(), msgUpper.end(), msgUpper.begin(), ::towupper);
+    if (msgUpper == L"QUIT" || msgUpper.rfind(L"QUIT ", 0) == 0) {
+        DebugLog(L"[Overlay] Received QUIT command via IPC, posting WM_QUIT");
+        PostQuitMessage(0);
+        return;
+    }
+
     // Expect: SET foregroundonly=0/1 color=#.. thickness=N corner=token or REFRESH ...
     auto lower = msg; 
     std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
