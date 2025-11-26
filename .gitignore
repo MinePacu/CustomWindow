@@ -3,6 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Markdown files (except README.md)
+*.md
+!README.md
+
 # User-specific files
 *.rsuser
 *.suo

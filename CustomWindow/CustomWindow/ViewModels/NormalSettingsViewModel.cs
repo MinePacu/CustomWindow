@@ -324,6 +324,31 @@ public partial class NormalSettingsViewModel : ObservableObject
             {
                 WindowTracker.AddExternalLog($"창 모서리 스타일 변경: {value ?? "기본"} (Windows 10에서는 적용 안됨)");
             }
+            
+            // 렌더링된 테두리 강제 새로고침
+            if (AutoWindowChange && BorderService.IsRunning)
+            {
+                try
+                {
+                    // 약간의 지연 후 새로고침 (DWM 적용 완료 대기)
+                    System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
+                    {
+                        try
+                        {
+                            BorderService.ForceRedraw();
+                            WindowTracker.AddExternalLog("창 모서리 변경 후 테두리 렌더링 새로고침");
+                        }
+                        catch (Exception ex)
+                        {
+                            WindowTracker.AddExternalLog($"테두리 새로고침 실패: {ex.Message}");
+                        }
+                    }, System.Threading.Tasks.TaskScheduler.Default);
+                }
+                catch (Exception ex)
+                {
+                    WindowTracker.AddExternalLog($"테두리 새로고침 스케줄링 실패: {ex.Message}");
+                }
+            }
         } 
     }
     
