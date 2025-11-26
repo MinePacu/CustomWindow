@@ -18,6 +18,9 @@ namespace CustomWindow.Pages
         public bool IsWindows11OrGreater { get; }
         public bool IsWindows10 => !IsWindows11OrGreater;
         
+        // 페이지 로딩 완료 플래그 - 초기 로딩 중 이벤트 무시
+        private bool _isPageLoaded = false;
+        
         public ColorSetting()
         {
             InitializeComponent();
@@ -29,6 +32,7 @@ namespace CustomWindow.Pages
             DataContext = ViewModel;
             
             Loaded += ColorSetting_Loaded;
+            Unloaded += ColorSetting_Unloaded;
         }
 
         private void ColorSetting_Loaded(object sender, RoutedEventArgs e)
@@ -39,6 +43,22 @@ namespace CustomWindow.Pages
                 ShowWindows10Warning();
                 DisableCustomCaptionFeaturesForWindows10();
             }
+            
+            // 로딩 완료 플래그 설정 (약간의 지연 후 - UI 초기화 완료 대기)
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            timer.Tick += (s, args) =>
+            {
+                _isPageLoaded = true;
+                timer.Stop();
+                WindowTracker.AddExternalLog("[ColorSetting] Page fully loaded, event handling enabled");
+            };
+            timer.Start();
+        }
+
+        private void ColorSetting_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = false;
+            WindowTracker.AddExternalLog("[ColorSetting] Page unloaded, event handling disabled");
         }
 
         private bool CheckWindows11()
@@ -224,6 +244,13 @@ namespace CustomWindow.Pages
 
         private void BorderColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
         {
+            // 페이지 로딩 중이면 이벤트 무시
+            if (!_isPageLoaded)
+            {
+                WindowTracker.AddExternalLog("[ColorSetting] Ignoring ColorChanged during page load");
+                return;
+            }
+
             var auto = App.ConfigStore!.Config.AutoWindowChange;
             var running = BorderService.IsRunning;
             var hex = ToHex(args.NewColor);
@@ -247,9 +274,23 @@ namespace CustomWindow.Pages
 
         private void BorderThicknessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
+            // 페이지 로딩 중이면 이벤트 무시
+            if (!_isPageLoaded)
+            {
+                WindowTracker.AddExternalLog($"[ColorSetting] Ignoring ThicknessChanged during page load (value={e.NewValue})");
+                return;
+            }
+
             var auto = App.ConfigStore!.Config.AutoWindowChange;
             var running = BorderService.IsRunning;
             var th = (int)e.NewValue;
+
+            // 두께가 너무 작으면(1 미만) 무시
+            if (th < 1)
+            {
+                WindowTracker.AddExternalLog($"[ColorSetting] Ignoring invalid thickness value: {th}");
+                return;
+            }
 
             WindowTracker.AddExternalLog($"[ColorSetting] Thickness changed -> {th} | Auto={auto} Running={running}");
 

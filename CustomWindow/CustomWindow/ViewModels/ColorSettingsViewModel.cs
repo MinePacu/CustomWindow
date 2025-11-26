@@ -147,7 +147,21 @@ public partial class ColorSettingsViewModel : ObservableObject
         get => _config.BorderThickness; 
         set 
         { 
+            // 두께 값 검증: 1-20 범위 제한
+            if (value < 1)
+            {
+                WindowTracker.AddExternalLog($"[ColorSettingsViewModel] Invalid thickness value ignored: {value} (must be >= 1)");
+                return;
+            }
+            if (value > 20)
+            {
+                WindowTracker.AddExternalLog($"[ColorSettingsViewModel] Thickness value clamped: {value} -> 20");
+                value = 20;
+            }
+            
             if (_config.BorderThickness == value) return;
+            
+            WindowTracker.AddExternalLog($"[ColorSettingsViewModel] BorderThickness changing: {_config.BorderThickness} -> {value}");
             _config.BorderThickness = value; 
             OnPropertyChanged(); 
         } 

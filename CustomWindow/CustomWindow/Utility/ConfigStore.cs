@@ -82,6 +82,18 @@ public sealed class ConfigStore
         c.CaptionColorMode ??= "밝게";
         c.WindowCornerMode ??= "기본";
         c.TaskbarCornerMode ??= "기본";
+
+        // BorderThickness 값 검증 및 보정
+        if (c.BorderThickness < 1)
+        {
+            WindowTracker.AddExternalLog($"[ConfigStore] Invalid BorderThickness {c.BorderThickness} detected, resetting to 3");
+            c.BorderThickness = 3;
+        }
+        else if (c.BorderThickness > 20)
+        {
+            WindowTracker.AddExternalLog($"[ConfigStore] BorderThickness {c.BorderThickness} too large, clamping to 20");
+            c.BorderThickness = 20;
+        }
     }
 
     private void ScheduleSave()
