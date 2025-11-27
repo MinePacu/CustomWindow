@@ -1,5 +1,7 @@
 # CustomWindow
 
+[English](README_EN.md) | [한국어](README.md)
+
 **CustomWindow**는 Windows 애플리케이션의 창 테두리를 사용자가 원하는 대로 커스터마이즈할 수 있는 유틸리티입니다. WinUI 3 기반의 직관적인 설정 UI와 C++ 기반의 고성능 오버레이 서비스를 제공합니다.
 
 ## ✨ 주요 기능
